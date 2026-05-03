@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --prussian: #ff6347;
+  --surface: #DFE0D8;
+  --accent: #B83C28;
+}
+
+@theme inline {
+  --color-background: #ff6347;
+  --color-foreground: #DFE0D8;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@keyframes letterWave {
+  0%, 100% { transform: translateY(0); }
+  40%       { transform: translateY(-8px); }
+  60%       { transform: translateY(-4px); }
+}
+
+.title-animated:hover .title-letter {
+  animation: letterWave 0.6s ease forwards;
+}
+
+.title-letter {
+  display: inline-block;
+  white-space: pre;
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-bg {
+  background: linear-gradient(135deg, #ff6347, #ff7558, #e85d47, #ff6b52, #f55d3e);
+  background-size: 300% 300%;
+  animation: gradientShift 24s ease infinite;
+}
+
+body {
+  background: #ff6347;
+  color: #DFE0D8;
+  font-family: Arial, Helvetica, sans-serif;
+}
