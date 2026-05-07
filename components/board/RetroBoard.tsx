@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import { getUserKey, getDisplayName, setDisplayName } from '@/lib/utils/userKey'
 import { getFormat } from '@/lib/utils/sessionFormats'
+import { getPhaseCapabilities } from '@/lib/utils/phaseUtils'
 import { useRetroChannel } from '@/lib/channels/useRetroChannel'
 import { useBoardStore } from '@/store/boardStore'
 import { usePresenceStore } from '@/store/presenceStore'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import BoardColumn from './BoardColumn'
+import ResultsView from './ResultsView'
+import WorkflowBreadcrumb from './WorkflowBreadcrumb'
 import JoinModal from '@/components/session/JoinModal'
 import InviteLinkButton from '@/components/session/InviteLinkButton'
 import FacilitatorControls from '@/components/session/FacilitatorControls'
@@ -38,6 +41,8 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
   const session = boardSession ?? initialSession
   const format = getFormat(session.format)
   const isFacilitator = session.facilitator_id === userKey
+  const phase = session.phase ?? 'writing'
+  const capabilities = getPhaseCapabilities(phase)
 
   const participantMap: Record<string, string> = {}
   for (const p of participants) {
@@ -60,6 +65,10 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
         { session_id: session.id, user_key: userKey, display_name: name },
         { onConflict: 'session_id,user_key' }
       )
+  }
+
+  function handleExport() {
+    window.open(`/api/export/${session.id}`, '_blank')
   }
 
   if (!mounted) {
@@ -91,6 +100,11 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
 
           <div className="flex items-center gap-3 flex-wrap">
             <PresenceBar />
+            {!isFacilitator && (
+              <div className="bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-3" style={{ height: '43px', display: 'flex', alignItems: 'center' }}>
+                <WorkflowBreadcrumb phase={phase} isFacilitator={false} />
+              </div>
+            )}
             {isFacilitator && <FacilitatorControls sessionId={session.id} />}
             <InviteLinkButton />
           </div>
@@ -100,29 +114,37 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
       {/* Board */}
       <main className="flex-1 p-4 md:p-6 overflow-auto">
         <div className="max-w-[1200px] mx-auto">
-        {!isLoaded ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            {format.columns.map((col) => (
-              <div key={col.id} className="border border-[#2d1200]/15 rounded-2xl p-4 animate-pulse h-48" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {format.columns.map((col) => (
-              <BoardColumn
-                key={col.id}
-                column={col}
-                sessionId={session.id}
-                userKey={userKey}
-                displayName={displayName ?? ''}
-                isRevealed={session.is_revealed}
-                isLocked={session.is_locked}
-                onBroadcastTyping={broadcastTyping}
-                participants={participantMap}
-              />
-            ))}
-          </div>
-        )}
+          {!isLoaded ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {format.columns.map((col) => (
+                <div key={col.id} className="border border-[#2d1200]/15 rounded-2xl p-4 animate-pulse h-48" />
+              ))}
+            </div>
+          ) : phase === 'results' ? (
+            <ResultsView
+              format={format}
+              sessionId={session.id}
+              userKey={userKey}
+              onExport={handleExport}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {format.columns.map((col) => (
+                <BoardColumn
+                  key={col.id}
+                  column={col}
+                  sessionId={session.id}
+                  userKey={userKey}
+                  displayName={displayName ?? ''}
+                  isRevealed={capabilities.isRevealed}
+                  isLocked={!capabilities.canAddCards}
+                  canVote={capabilities.canVote}
+                  onBroadcastTyping={broadcastTyping}
+                  participants={participantMap}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

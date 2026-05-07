@@ -33,12 +33,13 @@ interface BoardColumnProps {
   displayName: string
   isRevealed: boolean
   isLocked: boolean
+  canVote: boolean
   onBroadcastTyping: (cardId: string) => void
   participants: Record<string, string>
 }
 
 export default function BoardColumn({
-  column, sessionId, userKey, displayName, isRevealed, isLocked, onBroadcastTyping, participants,
+  column, sessionId, userKey, displayName, isRevealed, isLocked, canVote, onBroadcastTyping, participants,
 }: BoardColumnProps) {
   const allCards = useBoardStore((s) => s.cards)
   const optimisticCards = useBoardStore((s) => s.optimisticCards)
@@ -74,6 +75,7 @@ export default function BoardColumn({
             userKey={userKey}
             isRevealed={isRevealed}
             isLocked={isLocked}
+            canVote={canVote}
             displayName={displayName}
             onBroadcastTyping={onBroadcastTyping}
             participants={participants}

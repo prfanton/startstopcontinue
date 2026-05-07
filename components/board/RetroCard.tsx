@@ -14,13 +14,14 @@ interface RetroCardProps {
   userKey: string
   isRevealed: boolean
   isLocked: boolean
+  canVote: boolean
   displayName: string
   onBroadcastTyping: (cardId: string) => void
   participants: Record<string, string>
 }
 
 export default function RetroCard({
-  card, votes, userKey, isRevealed, isLocked, displayName, onBroadcastTyping, participants,
+  card, votes, userKey, isRevealed, isLocked, canVote, displayName, onBroadcastTyping, participants,
 }: RetroCardProps) {
   const supabase = getSupabaseClient()
   const applyCardDelete = useBoardStore((s) => s.applyCardDelete)
@@ -62,7 +63,7 @@ export default function RetroCard({
   }
 
   async function handleVote() {
-    if (isLocked) return
+    if (!canVote) return
     if (hasVoted) {
       applyVoteDelete({ card_id: card.id, user_key: userKey })
       await supabase.from('votes').delete().eq('card_id', card.id).eq('user_key', userKey)
@@ -124,7 +125,7 @@ export default function RetroCard({
           {isRevealed && (
             <button
               onClick={handleVote}
-              disabled={isLocked}
+              disabled={!canVote}
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                 hasVoted
                   ? 'bg-[#B83C28] text-white'

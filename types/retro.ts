@@ -1,3 +1,5 @@
+export type RetroPhase = 'writing' | 'grouping' | 'voting' | 'results'
+
 export interface Session {
   id: string
   created_at: string
@@ -6,6 +8,7 @@ export interface Session {
   format: 'wwwdw' | 'ssc' | 'msg'
   is_revealed: boolean
   is_locked: boolean
+  phase: RetroPhase
 }
 
 export interface Card {
