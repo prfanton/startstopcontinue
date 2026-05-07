@@ -1,36 +1,179 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
+  <img src="public/logo-espresso-retro-vertical.png" alt="Espresso Retro" height="160" />
 
-## Getting Started
+  <br />
 
-First, run the development server:
+  **Real-time team retrospectives. No login. Just share a link.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+  [![Deploy](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://retro-app-phi.vercel.app)
+  [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+  [![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ECF8E?logo=supabase)](https://supabase.com)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org)
+
+  [**→ Live App**](https://retro-app-phi.vercel.app)
+</div>
+
+---
+
+## What is Espresso Retro?
+
+Espresso Retro is a frictionless real-time retrospective tool built for agile teams. No accounts, no setup — create a session, share the link, and your team is in. Cards update live across every browser as they're typed, votes appear instantly, and the facilitator controls the reveal so no one is anchored to other people's opinions before writing their own.
+
+---
+
+## Features
+
+### For participants
+- **No login required** — enter a name and you're in
+- **Anonymous by default** — cards are hidden from others until the facilitator reveals them, preventing anchoring bias
+- **Live collaboration** — cards, votes, and presence update in real time across all connected browsers (~200ms)
+- **Typing indicators** — see when a teammate is actively writing on a card
+- **Upvoting** — vote on cards after reveal to surface the most important topics (one vote per person per card)
+- **Keyboard shortcuts** — `⌘↵` / `Ctrl↵` to submit a card
+
+### For facilitators
+- **Session timer** — built-in countdown timer (5 min default), adjustable by ±1 min, with play/pause and reset. Pulses red in the last minute
+- **Reveal control** — flip all cards visible at once when the team is done writing
+- **Export** — download the full board as a Markdown file with vote counts
+
+### Retro formats
+| Format | Columns |
+|---|---|
+| **Start / Stop / Continue** | Start · Stop · Continue |
+| **What Went Well / Didn't Go Well** | What Went Well · What Didn't Go Well · Action Items |
+| **Mad / Sad / Glad** | Mad · Sad · Glad |
+
+---
+
+## How it works
+
+```
+1. Facilitator creates a session → gets a unique URL
+2. Team joins via the shared link → enters their display name
+3. Everyone writes cards privately (hidden from others)
+4. Facilitator clicks Reveal → all cards flip visible simultaneously
+5. Team votes on cards to prioritize
+6. Facilitator exports the board as Markdown
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Presence** — live avatars in the header show who is currently in the session. Disappears within ~5 seconds of a tab closing.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Concurrent edit safety** — only the card author can edit their own card (enforced by Supabase RLS + UI). Votes are idempotent via a `UNIQUE(card_id, user_key)` constraint.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Tech stack
 
-To learn more about Next.js, take a look at the following resources:
+| Layer | Technology |
+|---|---|
+| Framework | [Next.js 16](https://nextjs.org) (App Router, Server Components) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS 4 |
+| Real-time | [Supabase Realtime](https://supabase.com/realtime) — Postgres Changes + Presence + Broadcast |
+| Database | Supabase (PostgreSQL) with Row Level Security |
+| State | [Zustand](https://zustand-demo.pmnd.rs) — slice-based selectors |
+| Deployment | [Vercel](https://vercel.com) |
+| Font | Inter (via `next/font/google`) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+```
+retro-app/
+├── app/
+│   ├── page.tsx                        # Landing — create session
+│   ├── retro/[sessionId]/page.tsx      # Board (Server Component → Client hydration)
+│   └── api/
+│       ├── sessions/route.ts           # POST: create session
+│       ├── cards/route.ts              # POST: create card
+│       └── export/[sessionId]/route.ts # GET: markdown export
+├── components/
+│   ├── board/          # RetroBoard, BoardColumn, RetroCard, CardEditor, AddCardButton
+│   ├── presence/       # PresenceBar, PresenceAvatar
+│   └── session/        # JoinModal, FacilitatorControls, InviteLinkButton
+├── lib/
+│   ├── channels/       # useRetroChannel — all Supabase Realtime subscriptions
+│   ├── supabase/       # Browser + server clients, generated types
+│   └── utils/          # userKey, sessionFormats, exportMarkdown
+├── store/
+│   ├── boardStore.ts   # Cards, votes, session state (Zustand)
+│   └── presenceStore.ts
+└── types/retro.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Real-time channel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A single Supabase channel per session handles all live features:
+
+```
+Channel: retro_{sessionId}
+  ├── postgres_changes → cards       (INSERT / UPDATE / DELETE)
+  ├── postgres_changes → votes       (INSERT / DELETE)
+  ├── postgres_changes → sessions    (UPDATE — reveal / lock state)
+  ├── presence                       → online participants
+  └── broadcast → CARD_TYPING        → typing indicators (3s timeout)
+```
+
+### Optimistic UI
+
+Card creation is optimistic — the card appears immediately in the UI with a temp ID, then is confirmed (or rolled back) once the server responds. This keeps the experience snappy even on high-latency connections.
+
+---
+
+## Database schema
+
+```sql
+sessions      id · facilitator_id · title · format · is_revealed · is_locked
+cards         id · session_id · column_id · author_key · content · position
+votes         id · card_id · user_key   (UNIQUE card_id, user_key)
+participants  id · session_id · user_key · display_name
+```
+
+Identity is anonymous — each browser gets a UUID v4 stored in `localStorage`. RLS policies ensure users can only modify their own cards.
+
+---
+
+## Running locally
+
+```bash
+# 1. Clone
+git clone https://github.com/prfanton/startstopcontinue.git
+cd startstopcontinue
+
+# 2. Install dependencies
+npm install
+
+# 3. Set environment variables
+cp .env.local.example .env.local
+# Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# 4. Run
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Environment variables
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous (public) key |
+
+---
+
+## Design
+
+- **Warm espresso palette** — deep brown `#2d1200` text on a linen tile background
+- **Frosted glass UI** — columns, cards, and controls use `backdrop-blur` + semi-transparent white, letting the background texture show through
+- **Accent** — `#B83C28` dark terracotta for interactive elements and the brand mark
+- All interactive controls are 43px tall for comfortable touch targets
+
+---
+
+## License
+
+MIT
