@@ -47,6 +47,7 @@ export default function AddCardButton({
       created_at: now,
       updated_at: now,
       position: maxPos + 1000,
+      group_id: null,
     }
 
     addOptimisticCard(optimistic)
