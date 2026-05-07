@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
 import { usePresenceStore } from '@/store/presenceStore'
-import type { Card, Vote, Session, PresenceUser } from '@/types/retro'
+import type { Card, Vote, Session, PresenceUser, CardGroup } from '@/types/retro'
 
 interface UseRetroChannelOptions {
   sessionId: string
@@ -18,9 +18,10 @@ type AnyPayload = { new: any; old: any; payload: any }
 export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroChannelOptions) {
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null>(null)
   const {
-    setSession, setCards, setVotes, setLoaded,
+    setSession, setCards, setVotes, setGroups, setLoaded,
     applyCardUpsert, applyCardDelete,
     applyVoteInsert, applyVoteDelete,
+    applyGroupUpsert, applyGroupDelete,
   } = useBoardStore.getState()
   const { setParticipants, setTyping, clearTyping } = usePresenceStore.getState()
 
@@ -28,9 +29,13 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
 
   async function fetchInitialData() {
     const supabase = getSupabaseClient()
-    const cardsRes = await supabase.from('cards').select('*').eq('session_id', sessionId)
+    const [cardsRes, groupsRes] = await Promise.all([
+      supabase.from('cards').select('*').eq('session_id', sessionId),
+      supabase.from('groups').select('*').eq('session_id', sessionId),
+    ])
     const cards = (cardsRes.data ?? []) as Card[]
     setCards(cards)
+    setGroups((groupsRes.data ?? []) as CardGroup[])
 
     const cardIds = cards.map((c) => c.id)
     if (cardIds.length > 0) {
@@ -81,6 +86,23 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'votes' },
       (payload: AnyPayload) => applyVoteDelete(payload.old as { card_id: string; user_key: string })
+    )
+
+    // Postgres Changes: groups
+    channel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'groups', filter: `session_id=eq.${sessionId}` },
+      (payload: AnyPayload) => applyGroupUpsert(payload.new as CardGroup)
+    )
+    channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'groups', filter: `session_id=eq.${sessionId}` },
+      (payload: AnyPayload) => applyGroupUpsert(payload.new as CardGroup)
+    )
+    channel.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'groups', filter: `session_id=eq.${sessionId}` },
+      (payload: AnyPayload) => applyGroupDelete((payload.old as { id: string }).id)
     )
 
     // Postgres Changes: sessions

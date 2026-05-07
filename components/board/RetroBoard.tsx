@@ -9,6 +9,7 @@ import { useBoardStore } from '@/store/boardStore'
 import { usePresenceStore } from '@/store/presenceStore'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import BoardColumn from './BoardColumn'
+import GroupingBoard from './GroupingBoard'
 import ResultsView from './ResultsView'
 import WorkflowBreadcrumb from './WorkflowBreadcrumb'
 import JoinModal from '@/components/session/JoinModal'
@@ -127,6 +128,8 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
               userKey={userKey}
               onExport={handleExport}
             />
+          ) : phase === 'grouping' ? (
+            <GroupingBoard format={format} sessionId={session.id} />
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
               {format.columns.map((col) => (

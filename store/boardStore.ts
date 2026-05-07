@@ -1,24 +1,28 @@
 'use client'
 
 import { create } from 'zustand'
-import type { Session, Card, Vote } from '@/types/retro'
+import type { Session, Card, Vote, CardGroup } from '@/types/retro'
 
 interface BoardStore {
   session: Session | null
   cards: Record<string, Card>
-  votes: Record<string, Vote[]>       // keyed by card.id
-  optimisticCards: Record<string, Card> // tempId → card
+  votes: Record<string, Vote[]>
+  groups: Record<string, CardGroup>
+  optimisticCards: Record<string, Card>
   isLoaded: boolean
 
   setSession: (session: Session) => void
   setCards: (cards: Card[]) => void
   setVotes: (votes: Vote[]) => void
+  setGroups: (groups: CardGroup[]) => void
   setLoaded: (loaded: boolean) => void
 
   applyCardUpsert: (card: Card) => void
   applyCardDelete: (id: string) => void
   applyVoteInsert: (vote: Vote) => void
   applyVoteDelete: (vote: { card_id: string; user_key: string }) => void
+  applyGroupUpsert: (group: CardGroup) => void
+  applyGroupDelete: (id: string) => void
 
   addOptimisticCard: (card: Card) => void
   confirmOptimisticCard: (tempId: string, serverCard: Card) => void
@@ -29,6 +33,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   session: null,
   cards: {},
   votes: {},
+  groups: {},
   optimisticCards: {},
   isLoaded: false,
 
@@ -50,9 +55,14 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     set({ votes: map })
   },
 
+  setGroups: (groups) => {
+    const map: Record<string, CardGroup> = {}
+    for (const g of groups) map[g.id] = g
+    set({ groups: map })
+  },
+
   applyCardUpsert: (card) => {
     const { optimisticCards } = get()
-    // Check if this is confirming an optimistic card
     const tempId = Object.keys(optimisticCards).find((tid) => {
       const opt = optimisticCards[tid]
       return (
@@ -97,6 +107,20 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         [card_id]: (state.votes[card_id] ?? []).filter((v) => v.user_key !== user_key),
       },
     })),
+
+  applyGroupUpsert: (group) =>
+    set((state) => ({ groups: { ...state.groups, [group.id]: group } })),
+
+  applyGroupDelete: (id) =>
+    set((state) => {
+      const { [id]: _, ...rest } = state.groups
+      // Ungroup cards that belonged to this group
+      const updatedCards: Record<string, Card> = {}
+      for (const [cid, card] of Object.entries(state.cards)) {
+        updatedCards[cid] = card.group_id === id ? { ...card, group_id: null } : card
+      }
+      return { groups: rest, cards: updatedCards }
+    }),
 
   addOptimisticCard: (card) =>
     set((state) => ({

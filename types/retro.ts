@@ -20,6 +20,16 @@ export interface Card {
   created_at: string
   updated_at: string
   position: number
+  group_id: string | null
+}
+
+export interface CardGroup {
+  id: string
+  session_id: string
+  column_id: string
+  name: string
+  position: number
+  created_at: string
 }
 
 export interface Vote {

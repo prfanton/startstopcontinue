@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useBoardStore } from '@/store/boardStore'
-import type { ColumnDef, RetroFormat } from '@/types/retro'
+import type { RetroFormat, Card } from '@/types/retro'
 
 interface ResultsViewProps {
   format: RetroFormat
@@ -13,6 +13,7 @@ interface ResultsViewProps {
 
 export default function ResultsView({ format, sessionId, onExport }: ResultsViewProps) {
   const allCards = useBoardStore((s) => s.cards)
+  const allGroups = useBoardStore((s) => s.groups)
   const votes = useBoardStore((s) => s.votes)
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -21,18 +22,12 @@ export default function ResultsView({ format, sessionId, onExport }: ResultsView
     [allCards, sessionId]
   )
 
-  const sortedColumns = useMemo(() => {
-    return [...format.columns].sort((a, b) => {
-      const totalA = sessionCards
-        .filter((c) => c.column_id === a.id)
-        .reduce((sum, c) => sum + (votes[c.id]?.length ?? 0), 0)
-      const totalB = sessionCards
-        .filter((c) => c.column_id === b.id)
-        .reduce((sum, c) => sum + (votes[c.id]?.length ?? 0), 0)
-      return totalB - totalA
-    })
-  }, [format.columns, sessionCards, votes])
+  const sessionGroups = useMemo(
+    () => Object.values(allGroups).filter((g) => g.session_id === sessionId),
+    [allGroups, sessionId]
+  )
 
+  // Total votes for a column = sum of votes across all cards in that column
   const columnTotals = useMemo(() => {
     const map: Record<string, number> = {}
     for (const col of format.columns) {
@@ -43,14 +38,43 @@ export default function ResultsView({ format, sessionId, onExport }: ResultsView
     return map
   }, [format.columns, sessionCards, votes])
 
+  // Columns sorted by total votes descending
+  const sortedColumns = useMemo(
+    () => [...format.columns].sort((a, b) => (columnTotals[b.id] ?? 0) - (columnTotals[a.id] ?? 0)),
+    [format.columns, columnTotals]
+  )
+
   const activeColumn = sortedColumns[activeIndex]
 
-  const activeCards = useMemo(() => {
+  // Build the display items for the active column: groups first (sorted by group total votes), then ungrouped cards
+  const activeItems = useMemo(() => {
     if (!activeColumn) return []
-    return sessionCards
-      .filter((c) => c.column_id === activeColumn.id)
+
+    const colCards = sessionCards.filter((c) => c.column_id === activeColumn.id)
+    const colGroups = sessionGroups.filter((g) => g.column_id === activeColumn.id)
+
+    type DisplayItem =
+      | { kind: 'group'; groupId: string; groupName: string; cards: Card[]; totalVotes: number }
+      | { kind: 'card'; card: Card; voteCount: number }
+
+    const items: DisplayItem[] = []
+
+    // Groups with their cards, sorted by group total votes desc
+    const groupItems = colGroups.map((g) => {
+      const cards = colCards.filter((c) => c.group_id === g.id).sort((a, b) => (votes[b.id]?.length ?? 0) - (votes[a.id]?.length ?? 0))
+      const totalVotes = cards.reduce((s, c) => s + (votes[c.id]?.length ?? 0), 0)
+      return { kind: 'group' as const, groupId: g.id, groupName: g.name, cards, totalVotes }
+    }).sort((a, b) => b.totalVotes - a.totalVotes)
+
+    // Ungrouped cards sorted by votes desc
+    const ungroupedItems = colCards
+      .filter((c) => !c.group_id)
       .sort((a, b) => (votes[b.id]?.length ?? 0) - (votes[a.id]?.length ?? 0))
-  }, [activeColumn, sessionCards, votes])
+      .map((card) => ({ kind: 'card' as const, card, voteCount: votes[card.id]?.length ?? 0 }))
+
+    items.push(...groupItems, ...ungroupedItems)
+    return items
+  }, [activeColumn, sessionCards, sessionGroups, votes])
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -62,10 +86,7 @@ export default function ResultsView({ format, sessionId, onExport }: ResultsView
   }, [sortedColumns.length])
 
   const DOT_COLOR_MAP: Record<string, string> = {
-    green: 'bg-green-400',
-    red: 'bg-red-400',
-    blue: 'bg-blue-400',
-    yellow: 'bg-yellow-400',
+    green: 'bg-green-400', red: 'bg-red-400', blue: 'bg-blue-400', yellow: 'bg-yellow-400',
   }
 
   return (
@@ -128,24 +149,46 @@ export default function ResultsView({ format, sessionId, onExport }: ResultsView
             </button>
           </div>
 
-          {/* Cards */}
-          {activeCards.length === 0 ? (
+          {/* Items */}
+          {activeItems.length === 0 ? (
             <p className="text-center text-[#2d1200]/40 text-sm py-8">No cards in this group</p>
           ) : (
             <div className="flex flex-col gap-3 max-w-2xl mx-auto">
-              {activeCards.map((card) => {
-                const voteCount = votes[card.id]?.length ?? 0
-                return (
-                  <div
-                    key={card.id}
-                    className="flex items-start gap-3 p-4 rounded-xl border border-[#2d1200]/10 bg-white/50"
-                  >
-                    <div className="flex items-center justify-center min-w-[2rem] h-8 rounded-full bg-[#B83C28]/10 text-[#B83C28] text-sm font-semibold">
-                      {voteCount}
+              {activeItems.map((item) => {
+                if (item.kind === 'group') {
+                  return (
+                    <div key={item.groupId} className="rounded-xl border border-[#2d1200]/15 bg-[#2d1200]/3 p-3.5">
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <svg className="w-3.5 h-3.5 text-[#2d1200]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <span className="text-xs font-semibold text-[#2d1200]/70">{item.groupName}</span>
+                        <span className="text-xs text-[#2d1200]/40">{item.cards.length} cards · {item.totalVotes}▲</span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {item.cards.map((card) => {
+                          const vc = votes[card.id]?.length ?? 0
+                          return (
+                            <div key={card.id} className="flex items-start gap-3 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50">
+                              <div className="flex items-center justify-center min-w-[1.75rem] h-7 rounded-full bg-[#B83C28]/10 text-[#B83C28] text-xs font-semibold">
+                                {vc}
+                              </div>
+                              <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{card.content}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">
-                      {card.content}
-                    </p>
+                  )
+                }
+
+                // Ungrouped card
+                return (
+                  <div key={item.card.id} className="flex items-start gap-3 p-4 rounded-xl border border-[#2d1200]/10 bg-white/50">
+                    <div className="flex items-center justify-center min-w-[2rem] h-8 rounded-full bg-[#B83C28]/10 text-[#B83C28] text-sm font-semibold">
+                      {item.voteCount}
+                    </div>
+                    <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{item.card.content}</p>
                   </div>
                 )
               })}
