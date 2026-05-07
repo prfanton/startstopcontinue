@@ -18,9 +18,9 @@ export default function JoinModal({ onJoin }: JoinModalProps) {
 
   return (
     <div className="fixed inset-0 bg-[#2d1200]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#DFE0D8] rounded-2xl p-8 w-full max-w-sm shadow-2xl">
-        <h2 className="text-2xl font-bold text-[#2d1200] mb-2">Join the session</h2>
-        <p className="text-[#2d1200]/60 mb-6 text-sm">Enter your name so teammates know who you are.</p>
+      <div className="bg-white/50 backdrop-blur-md rounded-2xl p-8 w-full max-w-sm shadow-2xl border border-white/50">
+        <h2 className="text-2xl font-bold text-[#2d1200] mb-2">What's your name?</h2>
+        <p className="text-[#2d1200]/60 mb-6 text-sm">Let teammates know who you are.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <input

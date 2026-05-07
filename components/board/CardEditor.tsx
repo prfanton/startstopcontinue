@@ -42,7 +42,7 @@ export default function CardEditor({
       }}
       onKeyDown={handleKeyDown}
       rows={3}
-      className="w-full bg-[#EDEEE6] border border-[#2d1200]/25 rounded-lg px-3 py-2 text-[#2d1200] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#B83C28] focus:border-transparent placeholder-[#2d1200]/55 leading-relaxed"
+      className="w-full bg-white/70 border border-[#2d1200]/15 rounded-lg px-3 py-2 text-[#2d1200] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#B83C28]/40 focus:border-[#B83C28]/30 placeholder-[#2d1200]/40 leading-relaxed"
     />
   )
 }

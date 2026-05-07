@@ -15,7 +15,8 @@ export default function InviteLinkButton() {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white text-sm rounded-lg transition-colors"
+      className="flex items-center gap-2 px-3 bg-white/40 backdrop-blur-sm hover:bg-white/60 border border-[#2d1200]/20 text-[#2d1200] text-sm font-medium rounded-lg transition-colors"
+      style={{ height: '43px' }}
     >
       {copied ? (
         <>

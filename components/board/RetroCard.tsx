@@ -75,7 +75,7 @@ export default function RetroCard({
 
   return (
     <div
-      className={`relative bg-[#DFE0D8] border rounded-xl p-3.5 group transition-all shadow-sm ${
+      className={`relative border rounded-xl p-3.5 group transition-all shadow-sm bg-white/50 backdrop-blur-md ${
         isOtherTyping
           ? 'border-[#B83C28] shadow-[0_0_0_2px_rgba(184,60,40,0.2)]'
           : 'border-[#2d1200]/10'
@@ -121,20 +121,22 @@ export default function RetroCard({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleVote}
-            disabled={isLocked}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-              hasVoted
-                ? 'bg-[#B83C28] text-white'
-                : 'bg-[#2d1200]/8 text-[#2d1200]/65 hover:bg-[#2d1200]/15 hover:text-[#2d1200]'
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            <svg className="w-3.5 h-3.5" fill={hasVoted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
-            {voteCount}
-          </button>
+          {isRevealed && (
+            <button
+              onClick={handleVote}
+              disabled={isLocked}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                hasVoted
+                  ? 'bg-[#B83C28] text-white'
+                  : 'bg-[#2d1200]/8 text-[#2d1200]/65 hover:bg-[#2d1200]/15 hover:text-[#2d1200]'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <svg className="w-3.5 h-3.5" fill={hasVoted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+              {voteCount}
+            </button>
+          )}
 
           {isAuthor && !isLocked && (
             <button
@@ -150,7 +152,7 @@ export default function RetroCard({
       </div>
 
       {saving && (
-        <div className="absolute inset-0 rounded-xl bg-[#DFE0D8]/70 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-xl bg-white/60 backdrop-blur-md flex items-center justify-center">
           <span className="text-xs text-[#2d1200]/65">Saving…</span>
         </div>
       )}

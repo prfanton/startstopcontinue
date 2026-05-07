@@ -6,17 +6,17 @@ import AddCardButton from './AddCardButton'
 import type { ColumnDef } from '@/types/retro'
 
 const BORDER_COLOR_MAP: Record<string, string> = {
-  green:  'border-white/25',
-  red:    'border-white/25',
-  blue:   'border-white/25',
-  yellow: 'border-white/25',
+  green:  'border-[#2d1200]/20',
+  red:    'border-[#2d1200]/20',
+  blue:   'border-[#2d1200]/20',
+  yellow: 'border-[#2d1200]/20',
 }
 
 const HEADER_COLOR_MAP: Record<string, string> = {
-  green:  'text-white',
-  red:    'text-white',
-  blue:   'text-white',
-  yellow: 'text-white',
+  green:  'text-[#2d1200]',
+  red:    'text-[#2d1200]',
+  blue:   'text-[#2d1200]',
+  yellow: 'text-[#2d1200]',
 }
 
 const DOT_COLOR_MAP: Record<string, string> = {
@@ -56,12 +56,12 @@ export default function BoardColumn({
   const dotClass = DOT_COLOR_MAP[column.color] ?? 'bg-blue-400'
 
   return (
-    <div className={`flex flex-col min-w-0 rounded-2xl p-4 border ${borderClass} bg-white/10 backdrop-blur-md shadow-lg`} style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+    <div className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]`} style={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-2 h-2 rounded-full ${dotClass}`} />
         <h3 className={`font-semibold text-base ${headerClass}`}>{column.label}</h3>
-        <span className="ml-auto text-xs text-white/60 font-medium">{colCards.length}</span>
+        <span className="ml-auto text-xs text-[#2d1200]/60 font-medium">{colCards.length}</span>
       </div>
 
       {/* Cards */}

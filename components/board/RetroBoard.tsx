@@ -75,41 +75,35 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
       {!displayName && <JoinModal onJoin={handleJoin} />}
 
       {/* Header */}
-      <header className="border-b border-white/10 px-4 py-3 flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <a href="/" className="title-animated text-white font-bold text-lg shrink-0 cursor-pointer select-none">
-            {'Start Stop Continue'.split('').map((ch, i) => (
-              <span
-                key={i}
-                className="title-letter"
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                {ch}
-              </span>
-            ))}
-          </a>
-          <span className="text-white/20">/</span>
-          <h1 className="text-white font-semibold truncate">{session.title}</h1>
-          {session.is_locked && (
-            <span className="shrink-0 text-xs px-2 py-0.5 bg-red-500/20 text-red-300 border border-red-400/30 rounded-full">
-              Locked
-            </span>
-          )}
-        </div>
+      <header className="px-4 py-3">
+        <div className="max-w-[1200px] mx-auto flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <a href="/" className="shrink-0 hover:opacity-80 transition-opacity">
+              <img
+                src="/logo-espresso-retro-horizontal.png"
+                alt="Espresso Retro"
+                className="h-20 w-auto"
+              />
+            </a>
+            <span className="text-[#2d1200]/30">/</span>
+            <h1 className="text-[#2d1200] font-semibold truncate">{session.title}</h1>
+          </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <PresenceBar />
-          {isFacilitator && <FacilitatorControls sessionId={session.id} />}
-          <InviteLinkButton />
+          <div className="flex items-center gap-3 flex-wrap">
+            <PresenceBar />
+            {isFacilitator && <FacilitatorControls sessionId={session.id} />}
+            <InviteLinkButton />
+          </div>
         </div>
       </header>
 
       {/* Board */}
       <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <div className="max-w-[1200px] mx-auto">
         {!isLoaded ? (
           <div className="grid gap-4 md:grid-cols-3">
             {format.columns.map((col) => (
-              <div key={col.id} className="border border-white/10 rounded-2xl p-4 animate-pulse h-48" />
+              <div key={col.id} className="border border-[#2d1200]/15 rounded-2xl p-4 animate-pulse h-48" />
             ))}
           </div>
         ) : (
@@ -129,6 +123,7 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
             ))}
           </div>
         )}
+        </div>
       </main>
     </div>
   )
