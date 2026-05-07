@@ -39,11 +39,15 @@ export default function HomePage() {
     <main className="animated-bg min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-[#DFE0D8] mb-2">Start Stop Continue</h1>
-          <p className="text-white/50 text-lg">Run better retrospectives with your team</p>
+          <img
+            src="/logo-espresso-retro-vertical.png"
+            alt="Start Stop Continue"
+            className="mx-auto mb-4 h-52 w-auto drop-shadow-lg"
+          />
+          <p className="text-[#2d1200]/70 text-lg">Run better retrospectives with your team</p>
         </div>
 
-        <div className="bg-[#DFE0D8] rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white/40 backdrop-blur-md rounded-2xl p-8 shadow-2xl border border-white/50">
           <h2 className="text-xl font-semibold text-[#2d1200] mb-6">Create a new session</h2>
 
           <div className="space-y-4">
@@ -87,7 +91,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <p className="text-center text-white/40 text-sm mt-6">
+        <p className="text-center text-[#2d1200]/60 text-sm mt-6">
           Have an invite link? Just open it directly.
         </p>
       </div>

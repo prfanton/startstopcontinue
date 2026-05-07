@@ -9,8 +9,7 @@
 @theme inline {
   --color-background: #ff6347;
   --color-foreground: #DFE0D8;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
 }
 
 @keyframes letterWave {
@@ -35,13 +34,14 @@
 }
 
 .animated-bg {
-  background: linear-gradient(135deg, #ff6347, #ff7558, #e85d47, #ff6b52, #f55d3e);
-  background-size: 300% 300%;
-  animation: gradientShift 24s ease infinite;
+  background: transparent;
 }
 
 body {
-  background: #ff6347;
-  color: #DFE0D8;
-  font-family: Arial, Helvetica, sans-serif;
+  background-image: url('/background-tile.png');
+  background-repeat: repeat;
+  background-size: 80px;
+  background-attachment: local;
+  color: #2d1200;
+  font-family: var(--font-inter), Inter, sans-serif;
 }

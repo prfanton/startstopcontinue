@@ -80,7 +80,7 @@ export default function AddCardButton({
 
   if (adding) {
     return (
-      <div className="bg-[#DFE0D8] border border-[#B83C28]/50 rounded-xl p-3.5 shadow-sm">
+      <div className="bg-[#FBF7F6] border border-[#2d1200]/12 rounded-xl p-3.5 shadow-[0_2px_12px_rgba(45,18,0,0.08)]">
         <CardEditor
           value={content}
           placeholder={placeholder}
@@ -89,7 +89,7 @@ export default function AddCardButton({
           onCancel={handleCancel}
           onTyping={() => onBroadcastTyping('new')}
         />
-        <div className="flex gap-2 mt-2 pt-2 border-t border-[#2d1200]/10">
+        <div className="flex gap-2 mt-2 pt-2 border-t border-[#2d1200]/8">
           <button
             onClick={handleSave}
             className="px-3 py-1.5 bg-[#B83C28] hover:bg-[#9c2e1a] text-white text-xs font-semibold rounded-lg transition-colors"
@@ -98,11 +98,11 @@ export default function AddCardButton({
           </button>
           <button
             onClick={handleCancel}
-            className="px-3 py-1.5 bg-[#2d1200]/8 hover:bg-[#2d1200]/15 text-[#2d1200]/60 text-xs font-medium rounded-lg transition-colors"
+            className="px-3 py-1.5 bg-[#2d1200]/6 hover:bg-[#2d1200]/12 text-[#2d1200]/55 text-xs font-medium rounded-lg transition-colors"
           >
             Cancel
           </button>
-          <span className="text-[#2d1200]/65 text-xs self-center">⌘↵ to add</span>
+          <span className="text-[#2d1200]/40 text-xs self-center">⌘↵ to add</span>
         </div>
       </div>
     )
@@ -111,7 +111,7 @@ export default function AddCardButton({
   return (
     <button
       onClick={() => setAdding(true)}
-      className="w-full flex items-center gap-2 px-3 py-2.5 border border-dashed border-white/20 hover:border-[#B83C28]/60 rounded-xl text-white/40 hover:text-[#B83C28] text-sm transition-colors"
+      className="w-full flex items-center gap-2 px-3 py-2.5 border border-dashed border-[#2d1200]/25 hover:border-[#B83C28]/60 rounded-xl text-[#2d1200]/45 hover:text-[#B83C28] text-sm transition-colors"
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
