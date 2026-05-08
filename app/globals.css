@@ -38,9 +38,8 @@
 }
 
 body {
-  background-image: url('/background-tile.png');
+  background-image: url('/assets/bg.png');
   background-repeat: repeat;
-  background-size: 80px;
   background-attachment: local;
   color: #2d1200;
   font-family: var(--font-inter), Inter, sans-serif;
