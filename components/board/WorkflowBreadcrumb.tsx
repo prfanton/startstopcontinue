@@ -45,68 +45,39 @@ const ORDER: RetroPhase[] = ['writing', 'grouping', 'voting', 'results']
 
 interface WorkflowBreadcrumbProps {
   phase: RetroPhase
-  isFacilitator: boolean
-  onAdvance?: () => void
-  onRetreat?: () => void
 }
 
-export default function WorkflowBreadcrumb({ phase, isFacilitator, onAdvance, onRetreat }: WorkflowBreadcrumbProps) {
+export { STEPS, ORDER }
+
+export default function WorkflowBreadcrumb({ phase }: WorkflowBreadcrumbProps) {
   const currentIndex = ORDER.indexOf(phase)
 
   return (
-    <div className="flex items-center gap-1.5">
-      {isFacilitator && (
-        <button
-          onClick={onRetreat}
-          disabled={currentIndex === 0}
-          className="p-1.5 rounded-lg text-[#2d1200]/50 hover:text-[#2d1200] hover:bg-white/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Previous step"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-      )}
+    <div className="flex items-center gap-1">
+      {STEPS.map((step, idx) => {
+        const isCompleted = idx < currentIndex
+        const isCurrent = idx === currentIndex
 
-      <div className="flex items-center gap-1">
-        {STEPS.map((step, idx) => {
-          const isCompleted = idx < currentIndex
-          const isCurrent = idx === currentIndex
-
-          return (
-            <div key={step.phase} className="flex items-center gap-1">
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  isCurrent
-                    ? 'bg-[#B83C28] text-white shadow-sm'
-                    : isCompleted
-                    ? 'bg-[#2d1200]/15 text-[#2d1200]/70'
-                    : 'bg-white/30 text-[#2d1200]/40 border border-[#2d1200]/10'
-                }`}
-              >
-                {step.icon}
-                <span className="hidden sm:inline">{step.label}</span>
-              </div>
-              {idx < STEPS.length - 1 && (
-                <div className={`w-4 h-px ${idx < currentIndex ? 'bg-[#2d1200]/30' : 'bg-[#2d1200]/15'}`} />
-              )}
+        return (
+          <div key={step.phase} className="flex items-center gap-1">
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                isCurrent
+                  ? 'bg-[#B83C28] text-white shadow-sm'
+                  : isCompleted
+                  ? 'bg-[#2d1200]/15 text-[#2d1200]/70'
+                  : 'bg-white/30 text-[#2d1200]/40 border border-[#2d1200]/10'
+              }`}
+            >
+              {step.icon}
+              <span>{step.label}</span>
             </div>
-          )
-        })}
-      </div>
-
-      {isFacilitator && (
-        <button
-          onClick={onAdvance}
-          disabled={currentIndex === ORDER.length - 1}
-          className="p-1.5 rounded-lg text-[#2d1200]/50 hover:text-[#2d1200] hover:bg-white/60 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Next step"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
+            {idx < STEPS.length - 1 && (
+              <div className={`w-4 h-px ${idx < currentIndex ? 'bg-[#2d1200]/30' : 'bg-[#2d1200]/15'}`} />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
