@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
+  useDroppable,
   useSensor,
   useSensors,
   closestCenter,
@@ -22,7 +24,11 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
 import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 
-// ─── Drag-handle icon ────────────────────────────────────────────────────────
+function trunc(text: string, max = 60) {
+  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text
+}
+
+// ─── Drag handle ─────────────────────────────────────────────────────────────
 
 function DragHandle() {
   return (
@@ -42,16 +48,10 @@ function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean
     data: { type: 'card', card },
   })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-  }
-
   return (
     <div
       ref={setNodeRef}
-      style={overlay ? undefined : style}
+      style={overlay ? undefined : { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
       {...attributes}
       className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed
         ${overlay ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90' : 'border-[#2d1200]/10 hover:border-[#2d1200]/25 transition-colors'}
@@ -65,203 +65,202 @@ function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean
   )
 }
 
-// ─── Card inside a group ──────────────────────────────────────────────────────
+// ─── Group stack (collapsed visual pile) ─────────────────────────────────────
 
-function GroupCard({ card, groupId, onRemoveFromGroup }: {
-  card: Card
-  groupId: string
-  onRemoveFromGroup: (cardId: string) => void
+function GroupStack({ group, cardCount, onOpen }: {
+  group: CardGroup
+  cardCount: number
+  onOpen: (id: string) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: card.id,
-    data: { type: 'card', card, groupId },
+  const { setNodeRef, isOver } = useDroppable({
+    id: `group:${group.id}`,
+    data: { type: 'group', group },
   })
 
   return (
     <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
-      {...attributes}
-      className="flex items-start gap-2 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50 text-sm text-[#2d1200] leading-relaxed group/card"
+      className={`relative select-none ${cardCount >= 3 ? 'mb-3' : cardCount >= 2 ? 'mb-2' : ''}`}
     >
-      <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
-        <DragHandle />
-      </span>
-      <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
-      <button
-        onClick={() => onRemoveFromGroup(card.id)}
-        title="Remove from group"
-        className="opacity-0 group-hover/card:opacity-100 mt-0.5 text-[#2d1200]/30 hover:text-[#B83C28] transition-all shrink-0"
+      {/* Ghost card layers peeking below the main tile */}
+      {cardCount >= 3 && (
+        <div className="absolute -bottom-2 left-3 right-3 h-full rounded-xl border border-[#2d1200]/8 bg-white/35 pointer-events-none" />
+      )}
+      {cardCount >= 2 && (
+        <div className="absolute -bottom-1 left-1.5 right-1.5 h-full rounded-xl border border-[#2d1200]/12 bg-white/50 pointer-events-none" />
+      )}
+
+      {/* Main group tile — droppable + clickable */}
+      <div
+        ref={setNodeRef}
+        onClick={() => onOpen(group.id)}
+        className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-colors
+          ${isOver
+            ? 'border-[#B83C28]/60 bg-[#B83C28]/6 shadow-md'
+            : 'border-[#2d1200]/18 bg-white/82 hover:border-[#2d1200]/30 hover:bg-white/90'}
+        `}
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <svg className="w-3.5 h-3.5 text-[#2d1200]/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
-      </button>
+        <span className="flex-1 text-sm font-medium text-[#2d1200] truncate min-w-0">{group.name}</span>
+        <span className="shrink-0 text-xs font-semibold text-white bg-[#2d1200]/35 rounded-full px-2 py-0.5 leading-5 min-w-[1.5rem] text-center">
+          {cardCount}
+        </span>
+      </div>
     </div>
   )
 }
 
-// ─── Group container ──────────────────────────────────────────────────────────
+// ─── Group dialog ─────────────────────────────────────────────────────────────
 
-function GroupContainer({ group, cards, columnId, onRename, onDissolve, onRemoveFromGroup }: {
+function GroupDialog({ group, cards, onClose, onRename, onDissolve, onRemoveFromGroup }: {
   group: CardGroup
   cards: Card[]
-  columnId: string
+  onClose: () => void
   onRename: (id: string, name: string) => void
   onDissolve: (id: string) => void
   onRemoveFromGroup: (cardId: string) => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const [nameVal, setNameVal] = useState(group.name)
+  const [name, setName] = useState(group.name)
 
-  const { setNodeRef, isOver } = useSortable({
-    id: `group:${group.id}`,
-    data: { type: 'group', group, columnId },
-  })
+  // Stay in sync with external renames from other users
+  useEffect(() => { setName(group.name) }, [group.name])
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   function commitRename() {
-    setEditing(false)
-    if (nameVal.trim() && nameVal.trim() !== group.name) {
-      onRename(group.id, nameVal.trim())
-    } else {
-      setNameVal(group.name)
-    }
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== group.name) onRename(group.id, trimmed)
   }
 
   return (
     <div
-      ref={setNodeRef}
-      className={`rounded-xl border-2 p-2.5 transition-colors ${
-        isOver ? 'border-[#B83C28]/50 bg-[#B83C28]/5' : 'border-[#2d1200]/15 bg-[#2d1200]/3'
-      }`}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {/* Group header */}
-      <div className="flex items-center gap-1.5 mb-2">
-        <svg className="w-3.5 h-3.5 text-[#2d1200]/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
+      <div
+        className="bg-[#FBF7F6] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-[#2d1200]/10">
+          <div className="flex items-center gap-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { commitRename(); (e.target as HTMLInputElement).blur() }
+              }}
+              className="flex-1 min-w-0 text-base font-semibold text-[#2d1200] bg-transparent border-b-2 border-transparent hover:border-[#2d1200]/15 focus:border-[#B83C28] outline-none pb-0.5 transition-colors"
+              placeholder="Group name"
+            />
+            <span className="shrink-0 text-xs text-[#2d1200]/40 font-medium">{cards.length} card{cards.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
 
-        {editing ? (
-          <input
-            autoFocus
-            value={nameVal}
-            onChange={(e) => setNameVal(e.target.value)}
-            onBlur={commitRename}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setNameVal(group.name); setEditing(false) } }}
-            className="flex-1 text-xs font-semibold text-[#2d1200] bg-transparent border-b border-[#B83C28] outline-none"
-          />
-        ) : (
-          <button
-            onClick={() => setEditing(true)}
-            className="flex-1 text-xs font-semibold text-[#2d1200] text-left hover:text-[#B83C28] transition-colors truncate"
-            title="Click to rename"
-          >
-            {group.name}
-          </button>
-        )}
-
-        <span className="text-xs text-[#2d1200]/40 shrink-0">{cards.length}</span>
-
-        <button
-          onClick={() => onDissolve(group.id)}
-          title="Dissolve group"
-          className="text-[#2d1200]/30 hover:text-[#B83C28] transition-colors shrink-0"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Cards inside group */}
-      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col gap-1.5">
+        {/* Card list */}
+        <div className="px-4 py-3 flex flex-col gap-2 max-h-72 overflow-y-auto">
           {cards.map((card) => (
-            <GroupCard key={card.id} card={card} groupId={group.id} onRemoveFromGroup={onRemoveFromGroup} />
+            <div key={card.id} className="flex items-start gap-3 p-3 rounded-xl border border-[#2d1200]/10 bg-white/70">
+              <p className="flex-1 text-sm text-[#2d1200] leading-relaxed">{card.content}</p>
+              <button
+                onClick={() => onRemoveFromGroup(card.id)}
+                className="shrink-0 text-xs text-[#B83C28] hover:underline font-medium mt-0.5 transition-opacity"
+              >
+                Ungroup
+              </button>
+            </div>
           ))}
           {cards.length === 0 && (
-            <p className="text-xs text-[#2d1200]/30 text-center py-2">Drop cards here</p>
+            <p className="text-sm text-[#2d1200]/40 text-center py-4">No cards in this group.</p>
           )}
         </div>
-      </SortableContext>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-[#2d1200]/10 flex items-center justify-between gap-3">
+          <button
+            onClick={() => { onDissolve(group.id); onClose() }}
+            className="text-sm text-[#2d1200]/50 hover:text-[#B83C28] transition-colors font-medium"
+          >
+            Dissolve group
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-[#B83C28] hover:bg-[#9c2e1a] text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── Droppable column ─────────────────────────────────────────────────────────
+// ─── Grouping column ──────────────────────────────────────────────────────────
 
 const DOT_COLOR_MAP: Record<string, string> = {
   green: 'bg-green-400', red: 'bg-red-400', blue: 'bg-blue-400', yellow: 'bg-yellow-400',
 }
 
-function GroupingColumn({
-  columnId, columnLabel, columnColor, sessionId,
-  ungroupedCards, groups, groupedCards,
-  onRename, onDissolve, onRemoveFromGroup,
-  isDropTarget,
-}: {
+function GroupingColumn({ columnId, columnLabel, columnColor, ungroupedCards, groups, cardsByGroup, onOpenGroup, isDropTarget }: {
   columnId: string
   columnLabel: string
   columnColor: string
-  sessionId: string
   ungroupedCards: Card[]
   groups: CardGroup[]
-  groupedCards: Record<string, Card[]>
-  onRename: (id: string, name: string) => void
-  onDissolve: (id: string) => void
-  onRemoveFromGroup: (cardId: string) => void
+  cardsByGroup: Record<string, Card[]>
+  onOpenGroup: (id: string) => void
   isDropTarget: boolean
 }) {
-  const { setNodeRef, isOver } = useSortable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `col:${columnId}`,
     data: { type: 'column', columnId },
   })
 
-  const totalCards = ungroupedCards.length + groups.reduce((s, g) => s + (groupedCards[g.id]?.length ?? 0), 0)
+  const totalCards = ungroupedCards.length + groups.reduce((s, g) => s + (cardsByGroup[g.id]?.length ?? 0), 0)
   const dotClass = DOT_COLOR_MAP[columnColor] ?? 'bg-blue-400'
-
-  // items for ungrouped SortableContext: cards + group containers
-  const ungroupedItems = ungroupedCards.map((c) => c.id)
-  const groupItems = groups.map((g) => `group:${g.id}`)
-  const columnItems = [...ungroupedItems, ...groupItems]
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10)] transition-colors
-        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/5' : ''}
+      className={`flex flex-col min-h-48 rounded-2xl p-4 border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10)] transition-colors
+        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/4' : ''}
       `}
       style={{ backdropFilter: 'blur(18px)' }}
     >
       <div className="flex items-center gap-2 mb-4">
-        <div className={`w-2 h-2 rounded-full ${dotClass}`} />
-        <h3 className="font-semibold text-base text-[#2d1200]">{columnLabel}</h3>
-        <span className="ml-auto text-xs text-[#2d1200]/60 font-medium">{totalCards}</span>
+        <div className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <h3 className="font-semibold text-base text-[#2d1200] truncate">{columnLabel}</h3>
+        <span className="ml-auto text-xs text-[#2d1200]/60 font-medium shrink-0">{totalCards}</span>
       </div>
 
-      <SortableContext items={columnItems} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col gap-2 flex-1">
+      <div className="flex flex-col gap-2 flex-1">
+        {groups.map((group) => (
+          <GroupStack
+            key={group.id}
+            group={group}
+            cardCount={cardsByGroup[group.id]?.length ?? 0}
+            onOpen={onOpenGroup}
+          />
+        ))}
+
+        <SortableContext items={ungroupedCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {ungroupedCards.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
-          {groups.map((group) => (
-            <GroupContainer
-              key={group.id}
-              group={group}
-              cards={groupedCards[group.id] ?? []}
-              columnId={columnId}
-              onRename={onRename}
-              onDissolve={onDissolve}
-              onRemoveFromGroup={onRemoveFromGroup}
-            />
-          ))}
-        </div>
-      </SortableContext>
+        </SortableContext>
+      </div>
     </div>
   )
 }
 
-// ─── Main GroupingBoard ───────────────────────────────────────────────────────
+// ─── Main board ───────────────────────────────────────────────────────────────
 
 interface GroupingBoardProps {
   format: RetroFormat
@@ -277,22 +276,23 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
   const applyGroupDelete = useBoardStore((s) => s.applyGroupDelete)
 
   const [activeCard, setActiveCard] = useState<Card | null>(null)
-  // Track which column we're hovering over for drop target highlight
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const [overColumnId, setOverColumnId] = useState<string | null>(null)
 
+  // MouseSensor: start drag after 5px movement (desktop)
+  // TouchSensor: start drag after 200ms press + 8px tolerance (mobile, avoids scroll conflict)
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   )
 
-  // Derived data per column
   const sessionCards = useMemo(
     () => Object.values(allCards).filter((c) => c.session_id === sessionId),
-    [allCards, sessionId]
+    [allCards, sessionId],
   )
-
   const sessionGroups = useMemo(
     () => Object.values(allGroups).filter((g) => g.session_id === sessionId),
-    [allGroups, sessionId]
+    [allGroups, sessionId],
   )
 
   const ungroupedByColumn = useMemo(() => {
@@ -323,23 +323,10 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     return map
   }, [sessionCards, sessionGroups])
 
-  // Helper: find which column a card or group belongs to
-  function getCardColumnId(cardId: string): string | null {
-    return allCards[cardId]?.column_id ?? null
-  }
-
-  function getGroupColumnId(groupId: string): string | null {
-    return allGroups[groupId]?.column_id ?? null
-  }
-
-  // Given a draggable id and an over id, determine the target column
-  function resolveTargetColumn(overId: string): string | null {
+  function resolveColumnId(overId: string): string | null {
     if (overId.startsWith('col:')) return overId.slice(4)
-    if (overId.startsWith('group:')) return getGroupColumnId(overId.slice(6))
-    // it's a card id
-    const card = allCards[overId]
-    if (card) return card.column_id
-    return null
+    if (overId.startsWith('group:')) return allGroups[overId.slice(6)]?.column_id ?? null
+    return allCards[overId]?.column_id ?? null
   }
 
   function onDragStart({ active }: DragStartEvent) {
@@ -347,10 +334,8 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     if (data?.type === 'card') setActiveCard(data.card as Card)
   }
 
-  function onDragOver({ active, over }: DragOverEvent) {
-    if (!over) { setOverColumnId(null); return }
-    const colId = resolveTargetColumn(String(over.id))
-    setOverColumnId(colId)
+  function onDragOver({ over }: DragOverEvent) {
+    setOverColumnId(over ? resolveColumnId(String(over.id)) : null)
   }
 
   async function onDragEnd({ active, over }: DragEndEvent) {
@@ -361,73 +346,61 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     const activeData = active.data.current
     if (activeData?.type !== 'card') return
 
-    const draggedCard: Card = activeData.card
+    const draggedCard = activeData.card as Card
     const overId = String(over.id)
     const overData = over.data.current
 
-    // --- Drop on a GROUP container ---
+    // ── Drop onto a group stack ──
     if (overId.startsWith('group:')) {
       const groupId = overId.slice(6)
       const group = allGroups[groupId]
-      if (!group) return
-      if (draggedCard.group_id === groupId) return // already in this group
-
-      const updated = { ...draggedCard, group_id: groupId, column_id: group.column_id }
-      applyCardUpsert(updated)
-      await supabase.from('cards').update({ group_id: groupId, column_id: group.column_id }).eq('id', draggedCard.id)
+      if (!group || draggedCard.group_id === groupId) return
+      applyCardUpsert({ ...draggedCard, group_id: groupId, column_id: group.column_id })
+      void supabase.from('cards').update({ group_id: groupId, column_id: group.column_id }).eq('id', draggedCard.id)
       return
     }
 
-    // --- Drop on a COLUMN (empty area) ---
+    // ── Drop onto column empty area ──
     if (overId.startsWith('col:')) {
       const targetColId = overId.slice(4)
-      if (draggedCard.group_id === null && draggedCard.column_id === targetColId) return
-
-      const updated = { ...draggedCard, group_id: null, column_id: targetColId }
-      applyCardUpsert(updated)
-      await supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
+      if (!draggedCard.group_id && draggedCard.column_id === targetColId) return
+      applyCardUpsert({ ...draggedCard, group_id: null, column_id: targetColId })
+      void supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
       return
     }
 
-    // --- Drop on another CARD ---
+    // ── Drop onto another card ──
     if (overData?.type === 'card') {
-      const targetCard: Card = overData.card
+      const targetCard = overData.card as Card
       if (targetCard.id === draggedCard.id) return
 
-      // If target card is already in a group → add dragged card to that group
+      // Target already in a group → join it
       if (targetCard.group_id) {
         const group = allGroups[targetCard.group_id]
         if (!group) return
-        const updated = { ...draggedCard, group_id: targetCard.group_id, column_id: group.column_id }
-        applyCardUpsert(updated)
-        await supabase.from('cards').update({ group_id: targetCard.group_id, column_id: group.column_id }).eq('id', draggedCard.id)
+        applyCardUpsert({ ...draggedCard, group_id: targetCard.group_id, column_id: group.column_id })
+        void supabase.from('cards').update({ group_id: targetCard.group_id, column_id: group.column_id }).eq('id', draggedCard.id)
         return
       }
 
-      // Both ungrouped → create new group in target card's column
+      // Both ungrouped → create new group
+      // Use client-generated UUID so optimistic updates are immediate
+      const newGroupId = crypto.randomUUID()
       const targetColId = targetCard.column_id
-      const existingGroupsInCol = groupsByColumn[targetColId] ?? []
-      const newPosition = existingGroupsInCol.length
+      const groupName = trunc(targetCard.content)
+      const position = (groupsByColumn[targetColId] ?? []).length
+      const now = new Date().toISOString()
 
-      // Create the group
-      const { data: newGroup } = await supabase
-        .from('groups')
-        .insert({ session_id: sessionId, column_id: targetColId, name: 'Group', position: newPosition })
-        .select()
-        .single()
+      applyGroupUpsert({ id: newGroupId, session_id: sessionId, column_id: targetColId, name: groupName, position, created_at: now })
+      applyCardUpsert({ ...draggedCard, group_id: newGroupId, column_id: targetColId })
+      applyCardUpsert({ ...targetCard, group_id: newGroupId })
 
-      if (!newGroup) return
-      applyGroupUpsert(newGroup as CardGroup)
-
-      // Move both cards into the group
-      const updatedDragged = { ...draggedCard, group_id: newGroup.id, column_id: targetColId }
-      const updatedTarget = { ...targetCard, group_id: newGroup.id }
-      applyCardUpsert(updatedDragged)
-      applyCardUpsert(updatedTarget)
-
-      await supabase.from('cards').update({ group_id: newGroup.id, column_id: targetColId }).eq('id', draggedCard.id)
-      await supabase.from('cards').update({ group_id: newGroup.id }).eq('id', targetCard.id)
-      return
+      // Fire all DB writes in parallel — don't block UI
+      await Promise.all([
+        supabase.from('groups').insert({ id: newGroupId, session_id: sessionId, column_id: targetColId, name: groupName, position }),
+        supabase.from('cards').update({ group_id: newGroupId, column_id: targetColId }).eq('id', draggedCard.id),
+        supabase.from('cards').update({ group_id: newGroupId }).eq('id', targetCard.id),
+      ])
     }
   }
 
@@ -435,46 +408,47 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     const group = allGroups[groupId]
     if (!group) return
     applyGroupUpsert({ ...group, name })
-    await supabase.from('groups').update({ name }).eq('id', groupId)
+    void supabase.from('groups').update({ name }).eq('id', groupId)
   }, [allGroups, applyGroupUpsert, supabase])
 
   const handleDissolveGroup = useCallback(async (groupId: string) => {
     const group = allGroups[groupId]
     if (!group) return
-    // Ungroup all cards first
-    const cardsInGroup = (cardsByGroup[groupId] ?? [])
-    for (const card of cardsInGroup) {
+    for (const card of cardsByGroup[groupId] ?? []) {
       applyCardUpsert({ ...card, group_id: null })
     }
     applyGroupDelete(groupId)
-    await supabase.from('cards').update({ group_id: null }).eq('group_id', groupId)
-    await supabase.from('groups').delete().eq('id', groupId)
+    await Promise.all([
+      supabase.from('cards').update({ group_id: null }).eq('group_id', groupId),
+      supabase.from('groups').delete().eq('id', groupId),
+    ])
   }, [allGroups, cardsByGroup, applyCardUpsert, applyGroupDelete, supabase])
 
   const handleRemoveFromGroup = useCallback(async (cardId: string) => {
     const card = allCards[cardId]
-    if (!card || !card.group_id) return
-    const updated = { ...card, group_id: null }
-    applyCardUpsert(updated)
-    await supabase.from('cards').update({ group_id: null }).eq('id', cardId)
+    if (!card?.group_id) return
+    applyCardUpsert({ ...card, group_id: null })
+    void supabase.from('cards').update({ group_id: null }).eq('id', cardId)
   }, [allCards, applyCardUpsert, supabase])
 
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
-    >
-      <div className="mb-3 flex items-center gap-2 text-xs text-[#2d1200]/50">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Drag cards onto each other to group them. Drag into another column to move. Click a group name to rename it.
-      </div>
+  const openGroup = openGroupId ? allGroups[openGroupId] : null
 
-      <SortableContext items={format.columns.map((c) => `col:${c.id}`)} strategy={verticalListSortingStrategy}>
+  return (
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+      >
+        <p className="mb-3 flex items-center gap-2 text-xs text-[#2d1200]/50">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Drag cards onto each other to group them. Tap a group to view and manage its cards.
+        </p>
+
         <div className="grid gap-4 md:grid-cols-3">
           {format.columns.map((col) => (
             <GroupingColumn
@@ -482,22 +456,30 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
               columnId={col.id}
               columnLabel={col.label}
               columnColor={col.color}
-              sessionId={sessionId}
               ungroupedCards={ungroupedByColumn[col.id] ?? []}
               groups={groupsByColumn[col.id] ?? []}
-              groupedCards={cardsByGroup}
-              onRename={handleRenameGroup}
-              onDissolve={handleDissolveGroup}
-              onRemoveFromGroup={handleRemoveFromGroup}
+              cardsByGroup={cardsByGroup}
+              onOpenGroup={setOpenGroupId}
               isDropTarget={overColumnId === col.id}
             />
           ))}
         </div>
-      </SortableContext>
 
-      <DragOverlay>
-        {activeCard && <SortableCard card={activeCard} overlay />}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay dropAnimation={null}>
+          {activeCard && <SortableCard card={activeCard} overlay />}
+        </DragOverlay>
+      </DndContext>
+
+      {openGroup && (
+        <GroupDialog
+          group={openGroup}
+          cards={cardsByGroup[openGroup.id] ?? []}
+          onClose={() => setOpenGroupId(null)}
+          onRename={handleRenameGroup}
+          onDissolve={handleDissolveGroup}
+          onRemoveFromGroup={handleRemoveFromGroup}
+        />
+      )}
+    </>
   )
 }
