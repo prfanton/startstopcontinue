@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getUserKey, getDisplayName, setDisplayName } from '@/lib/utils/userKey'
 import { getFormat } from '@/lib/utils/sessionFormats'
-import { getPhaseCapabilities } from '@/lib/utils/phaseUtils'
+import { getPhaseCapabilities, getNextPhase, getPrevPhase, getPhaseDbPatch } from '@/lib/utils/phaseUtils'
 import { useRetroChannel } from '@/lib/channels/useRetroChannel'
 import { useBoardStore } from '@/store/boardStore'
 import { usePresenceStore } from '@/store/presenceStore'
@@ -11,7 +11,7 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import BoardColumn from './BoardColumn'
 import GroupingBoard from './GroupingBoard'
 import ResultsView from './ResultsView'
-import WorkflowBreadcrumb from './WorkflowBreadcrumb'
+import WorkflowBreadcrumb, { STEPS, ORDER } from './WorkflowBreadcrumb'
 import JoinModal from '@/components/session/JoinModal'
 import InviteLinkButton from '@/components/session/InviteLinkButton'
 import FacilitatorControls from '@/components/session/FacilitatorControls'
@@ -45,6 +45,12 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
   const phase = session.phase ?? 'writing'
   const capabilities = getPhaseCapabilities(phase)
 
+  const currentIndex = ORDER.indexOf(phase)
+  const nextPhase = getNextPhase(phase)
+  const prevPhase = getPrevPhase(phase)
+  const nextLabel = nextPhase ? STEPS[ORDER.indexOf(nextPhase)].label : null
+  const prevLabel = prevPhase ? STEPS[ORDER.indexOf(prevPhase)].label : null
+
   const participantMap: Record<string, string> = {}
   for (const p of participants) {
     participantMap[p.user_key] = p.display_name
@@ -66,6 +72,18 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
         { session_id: session.id, user_key: userKey, display_name: name },
         { onConflict: 'session_id,user_key' }
       )
+  }
+
+  async function handleAdvance() {
+    if (!nextPhase) return
+    const supabase = getSupabaseClient()
+    await supabase.from('sessions').update(getPhaseDbPatch(nextPhase)).eq('id', session.id)
+  }
+
+  async function handleRetreat() {
+    if (!prevPhase) return
+    const supabase = getSupabaseClient()
+    await supabase.from('sessions').update(getPhaseDbPatch(prevPhase)).eq('id', session.id)
   }
 
   function handleExport() {
@@ -101,19 +119,50 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
 
           <div className="flex items-center gap-3 flex-wrap">
             <PresenceBar />
-            {!isFacilitator && (
-              <div className="bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-3" style={{ height: '43px', display: 'flex', alignItems: 'center' }}>
-                <WorkflowBreadcrumb phase={phase} isFacilitator={false} />
-              </div>
-            )}
-            {isFacilitator && <FacilitatorControls sessionId={session.id} />}
+            {isFacilitator && <FacilitatorControls />}
             <InviteLinkButton />
           </div>
         </div>
       </header>
 
+      {/* Workflow bar */}
+      <div className="px-4 pb-4">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="bg-white/50 backdrop-blur-sm border border-[#2d1200]/15 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+            <WorkflowBreadcrumb phase={phase} />
+
+            {isFacilitator && (
+              <div className="flex items-center gap-2 shrink-0">
+                {prevLabel && (
+                  <button
+                    onClick={handleRetreat}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-[#2d1200]/70 bg-[#2d1200]/8 hover:bg-[#2d1200]/15 border border-[#2d1200]/15 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    {prevLabel}
+                  </button>
+                )}
+                {nextLabel && (
+                  <button
+                    onClick={handleAdvance}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#B83C28] hover:bg-[#9c2e1a] shadow-sm shadow-[#B83C28]/30 transition-colors"
+                  >
+                    Move to {nextLabel}
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Board */}
-      <main className="flex-1 p-4 md:p-6 overflow-auto">
+      <main className="flex-1 p-4 md:p-6 overflow-auto pt-0">
         <div className="max-w-[1200px] mx-auto">
           {!isLoaded ? (
             <div className="grid gap-4 md:grid-cols-3">

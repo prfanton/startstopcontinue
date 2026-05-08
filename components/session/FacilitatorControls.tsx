@@ -1,20 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
-import { getNextPhase, getPrevPhase, getPhaseDbPatch } from '@/lib/utils/phaseUtils'
-import WorkflowBreadcrumb from '@/components/board/WorkflowBreadcrumb'
 
-interface FacilitatorControlsProps {
-  sessionId: string
-}
-
-export default function FacilitatorControls({ sessionId }: FacilitatorControlsProps) {
+export default function FacilitatorControls() {
   const session = useBoardStore((s) => s.session)
-  const supabase = getSupabaseClient()
 
-  // Timer state
   const DEFAULT_MINUTES = 5
   const [totalSeconds, setTotalSeconds] = useState(DEFAULT_MINUTES * 60)
   const [running, setRunning] = useState(false)
@@ -49,85 +40,55 @@ export default function FacilitatorControls({ sessionId }: FacilitatorControlsPr
 
   if (!session) return null
 
-  const phase = session.phase ?? 'writing'
-
-  async function handleAdvance() {
-    const next = getNextPhase(phase)
-    if (!next) return
-    await supabase.from('sessions').update(getPhaseDbPatch(next)).eq('id', sessionId)
-  }
-
-  async function handleRetreat() {
-    const prev = getPrevPhase(phase)
-    if (!prev) return
-    await supabase.from('sessions').update(getPhaseDbPatch(prev)).eq('id', sessionId)
-  }
-
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1 bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-2" style={{ height: '43px' }}>
+      <button
+        onClick={() => adjustMinutes(-1)}
+        className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
+        title="Remove 1 minute"
+      >−</button>
 
-      {/* Timer */}
-      <div className="flex items-center gap-1 bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-2" style={{ height: '43px' }}>
-        <button
-          onClick={() => adjustMinutes(-1)}
-          className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
-          title="Remove 1 minute"
-        >−</button>
+      <button
+        onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
+        className={`mx-1 text-sm font-sans font-semibold w-12 text-center transition-colors ${
+          isUrgent ? 'text-[#B83C28] animate-pulse' : 'text-[#2d1200]'
+        }`}
+        title={running ? 'Pause' : 'Start'}
+      >
+        {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+      </button>
 
-        <button
-          onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
-          className={`mx-1 text-sm font-sans font-semibold w-12 text-center transition-colors ${
-            isUrgent ? 'text-[#B83C28] animate-pulse' : 'text-[#2d1200]'
-          }`}
-          title={running ? 'Pause' : 'Start'}
-        >
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-        </button>
+      <button
+        onClick={() => adjustMinutes(1)}
+        className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
+        title="Add 1 minute"
+      >+</button>
 
-        <button
-          onClick={() => adjustMinutes(1)}
-          className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
-          title="Add 1 minute"
-        >+</button>
-
-        {/* Play/Pause icon */}
-        <button
-          onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
-          className="ml-1 text-[#B83C28] hover:text-[#8a2a1a] transition-colors"
-          title={running ? 'Pause' : 'Start'}
-        >
-          {running ? (
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 4h4v16H6zm8 0h4v16h-4z"/>
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          )}
-        </button>
-
-        {/* Reset */}
-        <button
-          onClick={resetTimer}
-          className="ml-0.5 text-[#2d1200]/40 hover:text-[#2d1200]/70 transition-colors"
-          title="Reset timer"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      <button
+        onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
+        className="ml-1 text-[#B83C28] hover:text-[#8a2a1a] transition-colors"
+        title={running ? 'Pause' : 'Start'}
+      >
+        {running ? (
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 4h4v16H6zm8 0h4v16h-4z"/>
           </svg>
-        </button>
-      </div>
+        ) : (
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
+      </button>
 
-      {/* Workflow breadcrumb with facilitator controls */}
-      <div className="bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-2" style={{ height: '43px', display: 'flex', alignItems: 'center' }}>
-        <WorkflowBreadcrumb
-          phase={phase}
-          isFacilitator={true}
-          onAdvance={handleAdvance}
-          onRetreat={handleRetreat}
-        />
-      </div>
+      <button
+        onClick={resetTimer}
+        className="ml-0.5 text-[#2d1200]/40 hover:text-[#2d1200]/70 transition-colors"
+        title="Reset timer"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
     </div>
   )
 }
