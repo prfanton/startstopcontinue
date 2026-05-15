@@ -57,7 +57,7 @@ export default function BoardColumn({
   const dotClass = DOT_COLOR_MAP[column.color] ?? 'bg-blue-400'
 
   return (
-    <div className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/40 bg-white/20 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]`} style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
+    <div className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/40 bg-white/20 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]`} style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-2 h-2 rounded-full ${dotClass}`} />
