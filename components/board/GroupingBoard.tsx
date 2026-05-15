@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  useDroppable,
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
@@ -17,15 +18,14 @@ import {
   useSortable,
   type SortingStrategy,
 } from '@dnd-kit/sortable'
-import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { getSupabaseClient } from '@/lib/supabase/client'
+import { useBoardStore } from '@/store/boardStore'
+import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 
 // Disables the "shuffle cards while dragging" animation — cards stay put and
 // only the hover highlight communicates where a drop will land.
 const noSortingStrategy: SortingStrategy = () => null
-import { getSupabaseClient } from '@/lib/supabase/client'
-import { useBoardStore } from '@/store/boardStore'
-import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 
 // ─── Drag-handle icon ────────────────────────────────────────────────────────
 
@@ -268,10 +268,10 @@ function GroupingColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10)] transition-colors
-        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/5' : ''}
+      className={`flex flex-col min-w-0 rounded-2xl p-4 border shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)] transition-colors
+        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/5' : 'border-white/40 bg-white/20'}
       `}
-      style={{ backdropFilter: 'blur(18px)' }}
+      style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
     >
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-2 h-2 rounded-full ${dotClass}`} />
@@ -364,20 +364,14 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     return map
   }, [sessionCards, sessionGroups])
 
-  // Helper: find which column a card or group belongs to
-  function getCardColumnId(cardId: string): string | null {
-    return allCards[cardId]?.column_id ?? null
-  }
-
   function getGroupColumnId(groupId: string): string | null {
     return allGroups[groupId]?.column_id ?? null
   }
 
-  // Given a draggable id and an over id, determine the target column
   function resolveTargetColumn(overId: string): string | null {
     if (overId.startsWith('col:')) return overId.slice(4)
     if (overId.startsWith('group:')) return getGroupColumnId(overId.slice(6))
-    // it's a card id
+    if (overId.startsWith('ungroup:')) return overId.slice(8)
     const card = allCards[overId]
     if (card) return card.column_id
     return null
@@ -409,7 +403,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     // --- Drop on the UNGROUP zone ---
     if (overId.startsWith('ungroup:')) {
       if (!draggedCard.group_id) return
-      const targetColId = overId.slice(7)
+      const targetColId = overId.slice(8)
       const updated = { ...draggedCard, group_id: null, column_id: targetColId }
       applyCardUpsert(updated)
       await supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
