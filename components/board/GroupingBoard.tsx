@@ -12,6 +12,7 @@ import {
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
+  type Modifier,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -26,6 +27,20 @@ import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 // Disables the "shuffle cards while dragging" animation — cards stay put and
 // only the hover highlight communicates where a drop will land.
 const noSortingStrategy: SortingStrategy = () => null
+
+// Keeps the drag overlay anchored to the pointer instead of the card's origin.
+const snapToPointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (draggingNodeRect && activatorEvent instanceof PointerEvent) {
+    const offsetX = activatorEvent.clientX - draggingNodeRect.left
+    const offsetY = activatorEvent.clientY - draggingNodeRect.top
+    return {
+      ...transform,
+      x: transform.x + draggingNodeRect.width / 2 - offsetX,
+      y: transform.y + draggingNodeRect.height / 2 - offsetY,
+    }
+  }
+  return transform
+}
 
 // ─── Drag-handle icon ────────────────────────────────────────────────────────
 
@@ -593,7 +608,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
         </div>
       </SortableContext>
 
-      <DragOverlay>
+      <DragOverlay modifiers={[snapToPointer]}>
         {activeCard && <SortableCard card={activeCard} overlay />}
       </DragOverlay>
     </DndContext>
