@@ -3,7 +3,10 @@
 import { useMemo } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
+import { usePresenceStore } from '@/store/presenceStore'
 import type { RetroFormat, Card, CardGroup } from '@/types/retro'
+
+const MAX_VOTES = 3
 
 const DOT_COLOR_MAP: Record<string, string> = {
   green: 'bg-green-400', red: 'bg-red-400', blue: 'bg-blue-400', yellow: 'bg-yellow-400',
@@ -17,14 +20,22 @@ interface VotingBoardProps {
 
 // ─── Vote button ──────────────────────────────────────────────────────────────
 
-function VoteButton({ count, hasVoted, onVote }: { count: number; hasVoted: boolean; onVote: () => void }) {
+function VoteButton({ count, hasVoted, disabled, onVote }: {
+  count: number
+  hasVoted: boolean
+  disabled: boolean
+  onVote: () => void
+}) {
   return (
     <button
       onClick={onVote}
+      disabled={disabled}
       className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
         hasVoted
           ? 'bg-[#B83C28] text-white'
-          : 'bg-[#2d1200]/8 text-[#2d1200]/65 hover:bg-[#2d1200]/15 hover:text-[#2d1200]'
+          : disabled
+            ? 'bg-[#2d1200]/5 text-[#2d1200]/25 cursor-not-allowed'
+            : 'bg-[#2d1200]/8 text-[#2d1200]/65 hover:bg-[#2d1200]/15 hover:text-[#2d1200]'
       }`}
     >
       <svg className="w-3 h-3" fill={hasVoted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
@@ -37,7 +48,12 @@ function VoteButton({ count, hasVoted, onVote }: { count: number; hasVoted: bool
 
 // ─── Group item ───────────────────────────────────────────────────────────────
 
-function GroupItem({ group, cards, userKey }: { group: CardGroup; cards: Card[]; userKey: string }) {
+function GroupItem({ group, cards, userKey, votesLeft }: {
+  group: CardGroup
+  cards: Card[]
+  userKey: string
+  votesLeft: number
+}) {
   const supabase = getSupabaseClient()
   const votes = useBoardStore((s) => s.votes)
   const applyVoteInsert = useBoardStore((s) => s.applyVoteInsert)
@@ -45,13 +61,11 @@ function GroupItem({ group, cards, userKey }: { group: CardGroup; cards: Card[];
 
   const totalVotes = cards.reduce((s, c) => s + (votes[c.id]?.length ?? 0), 0)
   const hasVoted = cards.some((c) => votes[c.id]?.some((v) => v.user_key === userKey))
-  // Proxy card: first card by position for storing the group vote
   const proxyCard = cards.slice().sort((a, b) => a.position - b.position)[0]
 
   async function handleVote() {
     if (!proxyCard) return
     if (hasVoted) {
-      // Remove votes from all cards in the group that this user voted on
       for (const card of cards) {
         const userVote = votes[card.id]?.find((v) => v.user_key === userKey)
         if (userVote) {
@@ -73,7 +87,7 @@ function GroupItem({ group, cards, userKey }: { group: CardGroup; cards: Card[];
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
         <span className="flex-1 text-xs font-semibold text-[#2d1200]/80 truncate">{group.name}</span>
-        <VoteButton count={totalVotes} hasVoted={hasVoted} onVote={handleVote} />
+        <VoteButton count={totalVotes} hasVoted={hasVoted} disabled={!hasVoted && votesLeft === 0} onVote={handleVote} />
       </div>
       <div className="flex flex-col gap-1.5">
         {cards.map((card) => (
@@ -88,7 +102,7 @@ function GroupItem({ group, cards, userKey }: { group: CardGroup; cards: Card[];
 
 // ─── Ungrouped card item ──────────────────────────────────────────────────────
 
-function CardItem({ card, userKey }: { card: Card; userKey: string }) {
+function CardItem({ card, userKey, votesLeft }: { card: Card; userKey: string; votesLeft: number }) {
   const supabase = getSupabaseClient()
   const votes = useBoardStore((s) => s.votes)
   const applyVoteInsert = useBoardStore((s) => s.applyVoteInsert)
@@ -112,19 +126,20 @@ function CardItem({ card, userKey }: { card: Card; userKey: string }) {
   return (
     <div className="flex items-start gap-2 p-3 rounded-xl border border-[#2d1200]/10 bg-white/60 shadow-sm">
       <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{card.content}</p>
-      <VoteButton count={voteCount} hasVoted={hasVoted} onVote={handleVote} />
+      <VoteButton count={voteCount} hasVoted={hasVoted} disabled={!hasVoted && votesLeft === 0} onVote={handleVote} />
     </div>
   )
 }
 
 // ─── Column ───────────────────────────────────────────────────────────────────
 
-function VotingColumn({ columnId, columnLabel, columnColor, sessionId, userKey }: {
+function VotingColumn({ columnId, columnLabel, columnColor, sessionId, userKey, votesLeft }: {
   columnId: string
   columnLabel: string
   columnColor: string
   sessionId: string
   userKey: string
+  votesLeft: number
 }) {
   const allCards = useBoardStore((s) => s.cards)
   const allGroups = useBoardStore((s) => s.groups)
@@ -170,15 +185,10 @@ function VotingColumn({ columnId, columnLabel, columnColor, sessionId, userKey }
 
       <div className="flex flex-col gap-2 flex-1">
         {groups.map((group) => (
-          <GroupItem
-            key={group.id}
-            group={group}
-            cards={cardsByGroup[group.id] ?? []}
-            userKey={userKey}
-          />
+          <GroupItem key={group.id} group={group} cards={cardsByGroup[group.id] ?? []} userKey={userKey} votesLeft={votesLeft} />
         ))}
         {ungroupedCards.map((card) => (
-          <CardItem key={card.id} card={card} userKey={userKey} />
+          <CardItem key={card.id} card={card} userKey={userKey} votesLeft={votesLeft} />
         ))}
         {totalItems === 0 && (
           <p className="text-xs text-[#2d1200]/30 text-center py-4">No cards</p>
@@ -188,21 +198,105 @@ function VotingColumn({ columnId, columnLabel, columnColor, sessionId, userKey }
   )
 }
 
+// ─── Vote status bar ──────────────────────────────────────────────────────────
+
+function VoteStatusBar({ userVoteCount, sessionId, userKey }: {
+  userVoteCount: number
+  sessionId: string
+  userKey: string
+}) {
+  const allCards = useBoardStore((s) => s.cards)
+  const votes = useBoardStore((s) => s.votes)
+  const participants = usePresenceStore((s) => s.participants)
+
+  const sessionCardIds = useMemo(
+    () => Object.values(allCards).filter((c) => c.session_id === sessionId).map((c) => c.id),
+    [allCards, sessionId]
+  )
+
+  // Participants who haven't cast any vote yet
+  const notVotedCount = useMemo(() => {
+    const voterKeys = new Set(
+      sessionCardIds.flatMap((cid) => (votes[cid] ?? []).map((v) => v.user_key))
+    )
+    return participants.filter((p) => !voterKeys.has(p.user_key) && p.user_key !== userKey).length
+  }, [sessionCardIds, votes, participants, userKey])
+
+  const votesLeft = MAX_VOTES - userVoteCount
+  const allDone = votesLeft === 0
+
+  return (
+    <div className="mb-4 flex items-center justify-between gap-4 px-1">
+      {/* My votes remaining */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[#2d1200]/50 font-medium">Your votes</span>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: MAX_VOTES }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                i < userVoteCount ? 'bg-[#B83C28] text-white' : 'bg-[#2d1200]/10'
+              }`}
+            >
+              {i < userVoteCount && (
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+        <span className={`text-xs font-semibold ${allDone ? 'text-[#B83C28]' : 'text-[#2d1200]/70'}`}>
+          {allDone ? 'All used' : `${votesLeft} left`}
+        </span>
+      </div>
+
+      {/* Participants still to vote */}
+      {participants.length > 1 && (
+        <span className="text-xs text-[#2d1200]/50">
+          {notVotedCount === 0
+            ? 'Everyone has voted'
+            : `${notVotedCount} ${notVotedCount === 1 ? 'person hasn\'t' : 'people haven\'t'} voted yet`}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function VotingBoard({ format, sessionId, userKey }: VotingBoardProps) {
+  const allCards = useBoardStore((s) => s.cards)
+  const votes = useBoardStore((s) => s.votes)
+
+  const userVoteCount = useMemo(() => {
+    const sessionCardIds = Object.values(allCards)
+      .filter((c) => c.session_id === sessionId)
+      .map((c) => c.id)
+    return sessionCardIds.reduce(
+      (sum, cid) => sum + (votes[cid]?.filter((v) => v.user_key === userKey).length ?? 0),
+      0
+    )
+  }, [allCards, votes, sessionId, userKey])
+
+  const votesLeft = Math.max(0, MAX_VOTES - userVoteCount)
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {format.columns.map((col) => (
-        <VotingColumn
-          key={col.id}
-          columnId={col.id}
-          columnLabel={col.label}
-          columnColor={col.color}
-          sessionId={sessionId}
-          userKey={userKey}
-        />
-      ))}
+    <div>
+      <VoteStatusBar userVoteCount={userVoteCount} sessionId={sessionId} userKey={userKey} />
+      <div className="grid gap-4 md:grid-cols-3">
+        {format.columns.map((col) => (
+          <VotingColumn
+            key={col.id}
+            columnId={col.id}
+            columnLabel={col.label}
+            columnColor={col.color}
+            sessionId={sessionId}
+            userKey={userKey}
+            votesLeft={votesLeft}
+          />
+        ))}
+      </div>
     </div>
   )
 }
