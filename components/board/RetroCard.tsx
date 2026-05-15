@@ -107,8 +107,8 @@ export default function RetroCard({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2d1200]/10">
+      {/* Footer — hidden during writing phase */}
+      {isRevealed && <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2d1200]/10">
         <div className="flex items-center gap-1.5">
           {isRevealed && (
             <>
@@ -150,7 +150,7 @@ export default function RetroCard({
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {saving && (
         <div className="absolute inset-0 rounded-xl bg-white/60 backdrop-blur-md flex items-center justify-center">

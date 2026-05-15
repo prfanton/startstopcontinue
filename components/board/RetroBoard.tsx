@@ -128,7 +128,7 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
       {/* Workflow bar */}
       <div className="px-4 pb-4">
         <div className="max-w-[1200px] mx-auto">
-          <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-2xl px-5 py-3 flex items-center justify-between gap-4" style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
+          <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]" style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
             <WorkflowBreadcrumb phase={phase} />
 
             {isFacilitator && (
