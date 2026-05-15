@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  useDroppable,
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
@@ -15,12 +16,16 @@ import {
 import {
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
+  type SortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
 import type { RetroFormat, Card, CardGroup } from '@/types/retro'
+
+// Disables the "shuffle cards while dragging" animation — cards stay put and
+// only the hover highlight communicates where a drop will land.
+const noSortingStrategy: SortingStrategy = () => null
 
 // ─── Drag-handle icon ────────────────────────────────────────────────────────
 
@@ -37,7 +42,7 @@ function DragHandle() {
 // ─── Draggable ungrouped card ─────────────────────────────────────────────────
 
 function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
     id: card.id,
     data: { type: 'card', card },
   })
@@ -48,19 +53,28 @@ function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean
     opacity: isDragging ? 0.3 : 1,
   }
 
+  const groupingHint = isOver && !isDragging
+
   return (
     <div
       ref={setNodeRef}
       style={overlay ? undefined : style}
       {...attributes}
-      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed
-        ${overlay ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90' : 'border-[#2d1200]/10 hover:border-[#2d1200]/25 transition-colors'}
+      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed transition-colors
+        ${overlay
+          ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90'
+          : groupingHint
+            ? 'border-[#B83C28]/60 bg-[#B83C28]/8 ring-2 ring-[#B83C28]/25'
+            : 'border-[#2d1200]/10 hover:border-[#2d1200]/25'}
       `}
     >
       <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
         <DragHandle />
       </span>
       <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
+      {groupingHint && (
+        <span className="shrink-0 mt-0.5 text-[#B83C28]/70 text-xs font-medium">Group</span>
+      )}
     </div>
   )
 }
@@ -97,6 +111,31 @@ function GroupCard({ card, groupId, onRemoveFromGroup }: {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
+    </div>
+  )
+}
+
+// ─── Ungroup drop zone ────────────────────────────────────────────────────────
+
+function UngroupZone({ columnId }: { columnId: string }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `ungroup:${columnId}`,
+    data: { type: 'ungroup', columnId },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-2.5 text-xs font-medium transition-colors ${
+        isOver
+          ? 'border-[#B83C28]/70 bg-[#B83C28]/10 text-[#B83C28]'
+          : 'border-[#2d1200]/25 text-[#2d1200]/40'
+      }`}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+      Ungroup
     </div>
   )
 }
@@ -174,7 +213,7 @@ function GroupContainer({ group, cards, columnId, onRename, onDissolve, onRemove
       </div>
 
       {/* Cards inside group */}
-      <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={cards.map((c) => c.id)} strategy={noSortingStrategy}>
         <div className="flex flex-col gap-1.5">
           {cards.map((card) => (
             <GroupCard key={card.id} card={card} groupId={group.id} onRemoveFromGroup={onRemoveFromGroup} />
@@ -198,7 +237,7 @@ function GroupingColumn({
   columnId, columnLabel, columnColor, sessionId,
   ungroupedCards, groups, groupedCards,
   onRename, onDissolve, onRemoveFromGroup,
-  isDropTarget,
+  isDropTarget, isDraggingGroupedCard,
 }: {
   columnId: string
   columnLabel: string
@@ -211,6 +250,7 @@ function GroupingColumn({
   onDissolve: (id: string) => void
   onRemoveFromGroup: (cardId: string) => void
   isDropTarget: boolean
+  isDraggingGroupedCard: boolean
 }) {
   const { setNodeRef, isOver } = useSortable({
     id: `col:${columnId}`,
@@ -228,10 +268,10 @@ function GroupingColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-0 rounded-2xl p-4 border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10)] transition-colors
-        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/5' : ''}
+      className={`flex flex-col min-w-0 rounded-2xl p-4 border shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)] transition-colors
+        ${isOver && isDropTarget ? 'border-[#B83C28]/40 bg-[#B83C28]/5' : 'border-white/40 bg-white/20'}
       `}
-      style={{ backdropFilter: 'blur(18px)' }}
+      style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
     >
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-2 h-2 rounded-full ${dotClass}`} />
@@ -239,8 +279,9 @@ function GroupingColumn({
         <span className="ml-auto text-xs text-[#2d1200]/60 font-medium">{totalCards}</span>
       </div>
 
-      <SortableContext items={columnItems} strategy={verticalListSortingStrategy}>
+      <SortableContext items={columnItems} strategy={noSortingStrategy}>
         <div className="flex flex-col gap-2 flex-1">
+          {isDraggingGroupedCard && <UngroupZone columnId={columnId} />}
           {ungroupedCards.map((card) => (
             <SortableCard key={card.id} card={card} />
           ))}
@@ -323,20 +364,14 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     return map
   }, [sessionCards, sessionGroups])
 
-  // Helper: find which column a card or group belongs to
-  function getCardColumnId(cardId: string): string | null {
-    return allCards[cardId]?.column_id ?? null
-  }
-
   function getGroupColumnId(groupId: string): string | null {
     return allGroups[groupId]?.column_id ?? null
   }
 
-  // Given a draggable id and an over id, determine the target column
   function resolveTargetColumn(overId: string): string | null {
     if (overId.startsWith('col:')) return overId.slice(4)
     if (overId.startsWith('group:')) return getGroupColumnId(overId.slice(6))
-    // it's a card id
+    if (overId.startsWith('ungroup:')) return overId.slice(8)
     const card = allCards[overId]
     if (card) return card.column_id
     return null
@@ -364,6 +399,16 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     const draggedCard: Card = activeData.card
     const overId = String(over.id)
     const overData = over.data.current
+
+    // --- Drop on the UNGROUP zone ---
+    if (overId.startsWith('ungroup:')) {
+      if (!draggedCard.group_id) return
+      const targetColId = overId.slice(8)
+      const updated = { ...draggedCard, group_id: null, column_id: targetColId }
+      applyCardUpsert(updated)
+      await supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
+      return
+    }
 
     // --- Drop on a GROUP container ---
     if (overId.startsWith('group:')) {
@@ -474,7 +519,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
         Drag cards onto each other to group them. Drag into another column to move. Click a group name to rename it.
       </div>
 
-      <SortableContext items={format.columns.map((c) => `col:${c.id}`)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={format.columns.map((c) => `col:${c.id}`)} strategy={noSortingStrategy}>
         <div className="grid gap-4 md:grid-cols-3">
           {format.columns.map((col) => (
             <GroupingColumn
@@ -490,6 +535,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
               onDissolve={handleDissolveGroup}
               onRemoveFromGroup={handleRemoveFromGroup}
               isDropTarget={overColumnId === col.id}
+              isDraggingGroupedCard={activeCard?.group_id != null}
             />
           ))}
         </div>
