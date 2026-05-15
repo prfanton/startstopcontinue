@@ -10,6 +10,7 @@ import { usePresenceStore } from '@/store/presenceStore'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import BoardColumn from './BoardColumn'
 import GroupingBoard from './GroupingBoard'
+import VotingBoard from './VotingBoard'
 import ResultsView from './ResultsView'
 import WorkflowBreadcrumb, { STEPS, ORDER } from './WorkflowBreadcrumb'
 import JoinModal from '@/components/session/JoinModal'
@@ -128,7 +129,7 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
       {/* Workflow bar */}
       <div className="px-4 pb-4">
         <div className="max-w-[1200px] mx-auto">
-          <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]" style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
+          <div className="bg-white/20 backdrop-blur-md border border-white/40 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)]" style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
             <WorkflowBreadcrumb phase={phase} />
 
             {isFacilitator && (
@@ -179,6 +180,8 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
             />
           ) : phase === 'grouping' ? (
             <GroupingBoard format={format} sessionId={session.id} />
+          ) : phase === 'voting' ? (
+            <VotingBoard format={format} sessionId={session.id} userKey={userKey} />
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
               {format.columns.map((col) => (

@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
 import type { RetroFormat, Card } from '@/types/retro'
+
+const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '💡', '🔥', '😮', '😢', '👎']
 
 interface ResultsViewProps {
   format: RetroFormat
@@ -11,11 +14,128 @@ interface ResultsViewProps {
   onExport: () => void
 }
 
-export default function ResultsView({ format, sessionId, onExport }: ResultsViewProps) {
+// ─── Reaction bar per card ────────────────────────────────────────────────────
+
+function ReactionBar({ cardId, userKey }: { cardId: string; userKey: string }) {
+  const supabase = getSupabaseClient()
+  const reactions = useBoardStore((s) => s.reactions)
+  const applyReactionInsert = useBoardStore((s) => s.applyReactionInsert)
+  const applyReactionDelete = useBoardStore((s) => s.applyReactionDelete)
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const cardReactions = reactions[cardId] ?? []
+
+  // Group by emoji: emoji → { count, hasReacted }
+  const grouped = useMemo(() => {
+    const map: Record<string, { count: number; hasReacted: boolean }> = {}
+    for (const r of cardReactions) {
+      if (!map[r.emoji]) map[r.emoji] = { count: 0, hasReacted: false }
+      map[r.emoji].count++
+      if (r.user_key === userKey) map[r.emoji].hasReacted = true
+    }
+    return map
+  }, [cardReactions, userKey])
+
+  async function toggleReaction(emoji: string) {
+    setPickerOpen(false)
+    if (grouped[emoji]?.hasReacted) {
+      applyReactionDelete({ card_id: cardId, user_key: userKey, emoji })
+      await supabase.from('reactions').delete().eq('card_id', cardId).eq('user_key', userKey).eq('emoji', emoji)
+    } else {
+      const newReaction = { id: crypto.randomUUID(), card_id: cardId, user_key: userKey, emoji, created_at: new Date().toISOString() }
+      applyReactionInsert(newReaction)
+      await supabase.from('reactions').insert({ card_id: cardId, user_key: userKey, emoji })
+    }
+  }
+
+  return (
+    <div className="relative flex items-center flex-wrap gap-1 mt-2">
+      {/* Existing reactions */}
+      {Object.entries(grouped).map(([emoji, { count, hasReacted }]) => (
+        <button
+          key={emoji}
+          onClick={() => toggleReaction(emoji)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-sm border transition-colors ${
+            hasReacted
+              ? 'bg-[#B83C28]/10 border-[#B83C28]/40 text-[#2d1200]'
+              : 'bg-white/40 border-[#2d1200]/15 text-[#2d1200]/70 hover:bg-white/70'
+          }`}
+        >
+          {emoji}
+          <span className="text-xs font-medium">{count}</span>
+        </button>
+      ))}
+
+      {/* Add reaction button */}
+      <div className="relative">
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border border-dashed border-[#2d1200]/20 text-[#2d1200]/40 hover:border-[#2d1200]/40 hover:text-[#2d1200]/70 transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          React
+        </button>
+
+        {pickerOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+            <div className="absolute left-0 bottom-full mb-1 z-20 bg-white rounded-xl shadow-lg border border-[#2d1200]/10 p-1.5 flex gap-0.5">
+              {EMOJI_OPTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(emoji)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:bg-[#2d1200]/8 transition-colors ${
+                    grouped[emoji]?.hasReacted ? 'bg-[#B83C28]/10' : ''
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Center panel card ────────────────────────────────────────────────────────
+
+function CenterCard({ card, userKey, voteCount }: { card: Card; userKey: string; voteCount: number }) {
+  return (
+    <div className="py-4 border-b border-[#2d1200]/8 last:border-0">
+      <div className="flex items-start gap-3">
+        {voteCount > 0 && (
+          <div className="shrink-0 mt-0.5 flex items-center gap-1 text-[#B83C28] text-xs font-semibold">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M5 15l7-7 7 7" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+            {voteCount}
+          </div>
+        )}
+        <div className="flex-1">
+          <p className="text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{card.content}</p>
+          <ReactionBar cardId={card.id} userKey={userKey} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ResultsView ─────────────────────────────────────────────────────────
+
+type SidebarItem =
+  | { kind: 'group'; id: string; name: string; totalVotes: number; cards: Card[] }
+  | { kind: 'card'; id: string; card: Card; voteCount: number }
+
+export default function ResultsView({ format, sessionId, userKey, onExport }: ResultsViewProps) {
   const allCards = useBoardStore((s) => s.cards)
   const allGroups = useBoardStore((s) => s.groups)
   const votes = useBoardStore((s) => s.votes)
-  const [activeIndex, setActiveIndex] = useState(0)
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const sessionCards = useMemo(
     () => Object.values(allCards).filter((c) => c.session_id === sessionId),
@@ -27,188 +147,159 @@ export default function ResultsView({ format, sessionId, onExport }: ResultsView
     [allGroups, sessionId]
   )
 
-  // Total votes for a column = sum of votes across all cards in that column
-  const columnTotals = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const col of format.columns) {
-      map[col.id] = sessionCards
-        .filter((c) => c.column_id === col.id)
-        .reduce((sum, c) => sum + (votes[c.id]?.length ?? 0), 0)
-    }
-    return map
-  }, [format.columns, sessionCards, votes])
+  // Build sidebar items across all columns, sorted by votes desc
+  const sidebarItems = useMemo((): SidebarItem[] => {
+    const items: SidebarItem[] = []
 
-  // Columns sorted by total votes descending
-  const sortedColumns = useMemo(
-    () => [...format.columns].sort((a, b) => (columnTotals[b.id] ?? 0) - (columnTotals[a.id] ?? 0)),
-    [format.columns, columnTotals]
-  )
-
-  const activeColumn = sortedColumns[activeIndex]
-
-  // Build the display items for the active column: groups first (sorted by group total votes), then ungrouped cards
-  const activeItems = useMemo(() => {
-    if (!activeColumn) return []
-
-    const colCards = sessionCards.filter((c) => c.column_id === activeColumn.id)
-    const colGroups = sessionGroups.filter((g) => g.column_id === activeColumn.id)
-
-    type DisplayItem =
-      | { kind: 'group'; groupId: string; groupName: string; cards: Card[]; totalVotes: number }
-      | { kind: 'card'; card: Card; voteCount: number }
-
-    const items: DisplayItem[] = []
-
-    // Groups with their cards, sorted by group total votes desc
-    const groupItems = colGroups.map((g) => {
-      const cards = colCards.filter((c) => c.group_id === g.id).sort((a, b) => (votes[b.id]?.length ?? 0) - (votes[a.id]?.length ?? 0))
+    for (const group of sessionGroups) {
+      const cards = sessionCards
+        .filter((c) => c.group_id === group.id)
+        .sort((a, b) => a.position - b.position)
       const totalVotes = cards.reduce((s, c) => s + (votes[c.id]?.length ?? 0), 0)
-      return { kind: 'group' as const, groupId: g.id, groupName: g.name, cards, totalVotes }
-    }).sort((a, b) => b.totalVotes - a.totalVotes)
-
-    // Ungrouped cards sorted by votes desc
-    const ungroupedItems = colCards
-      .filter((c) => !c.group_id)
-      .sort((a, b) => (votes[b.id]?.length ?? 0) - (votes[a.id]?.length ?? 0))
-      .map((card) => ({ kind: 'card' as const, card, voteCount: votes[card.id]?.length ?? 0 }))
-
-    items.push(...groupItems, ...ungroupedItems)
-    return items
-  }, [activeColumn, sessionCards, sessionGroups, votes])
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'ArrowLeft') setActiveIndex((i) => Math.max(0, i - 1))
-      if (e.key === 'ArrowRight') setActiveIndex((i) => Math.min(sortedColumns.length - 1, i + 1))
+      items.push({ kind: 'group', id: group.id, name: group.name, totalVotes, cards })
     }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [sortedColumns.length])
+
+    for (const card of sessionCards.filter((c) => !c.group_id)) {
+      const voteCount = votes[card.id]?.length ?? 0
+      items.push({ kind: 'card', id: card.id, card, voteCount })
+    }
+
+    return items.sort((a, b) => {
+      const va = a.kind === 'group' ? a.totalVotes : a.voteCount
+      const vb = b.kind === 'group' ? b.totalVotes : b.voteCount
+      return vb - va
+    })
+  }, [sessionGroups, sessionCards, votes])
+
+  // Auto-select first item
+  const activeId = selectedId ?? sidebarItems[0]?.id ?? null
+  const activeItem = sidebarItems.find((i) => i.id === activeId) ?? null
 
   const DOT_COLOR_MAP: Record<string, string> = {
     green: 'bg-green-400', red: 'bg-red-400', blue: 'bg-blue-400', yellow: 'bg-yellow-400',
   }
 
+  function columnDotClass(columnId: string) {
+    const col = format.columns.find((c) => c.id === columnId)
+    return col ? (DOT_COLOR_MAP[col.color] ?? 'bg-blue-400') : 'bg-blue-400'
+  }
+
+  function columnLabel(columnId: string) {
+    return format.columns.find((c) => c.id === columnId)?.label ?? ''
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Summary pills */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        {sortedColumns.map((col, idx) => (
+    <div className="flex gap-6 h-full min-h-[600px]">
+      {/* ── Left sidebar ── */}
+      <aside className="w-64 shrink-0 flex flex-col gap-1 overflow-y-auto pr-1">
+        {sidebarItems.map((item) => {
+          const isActive = item.id === activeId
+          if (item.kind === 'group') {
+            const dotClass = item.cards[0] ? columnDotClass(item.cards[0].column_id) : 'bg-blue-400'
+            return (
+              <button
+                key={item.id}
+                onClick={() => setSelectedId(item.id)}
+                className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${
+                  isActive ? 'bg-white/50 shadow-sm' : 'hover:bg-white/30'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+                  <span className="flex-1 text-xs font-semibold text-[#2d1200] truncate">{item.name}</span>
+                  {item.totalVotes > 0 && (
+                    <span className="text-xs text-[#B83C28] font-semibold shrink-0">▲{item.totalVotes}</span>
+                  )}
+                </div>
+                <p className="mt-0.5 ml-3.5 text-[11px] text-[#2d1200]/40">{item.cards.length} cards</p>
+              </button>
+            )
+          }
+          // Ungrouped card
+          const dotClass = columnDotClass(item.card.column_id)
+          return (
+            <button
+              key={item.id}
+              onClick={() => setSelectedId(item.id)}
+              className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${
+                isActive ? 'bg-white/50 shadow-sm' : 'hover:bg-white/30'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1`} style={{ background: 'transparent', border: '1.5px solid', borderColor: 'rgba(45,18,0,0.25)' }} />
+                <span className="flex-1 text-xs text-[#2d1200]/80 line-clamp-2 leading-relaxed">{item.card.content}</span>
+                {item.voteCount > 0 && (
+                  <span className="text-xs text-[#B83C28] font-semibold shrink-0">▲{item.voteCount}</span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+
+        {sidebarItems.length === 0 && (
+          <p className="text-xs text-[#2d1200]/30 text-center py-8">No cards yet</p>
+        )}
+
+        {/* Export */}
+        <div className="mt-auto pt-4">
           <button
-            key={col.id}
-            onClick={() => setActiveIndex(idx)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
-              idx === activeIndex
-                ? 'bg-[#B83C28] text-white border-[#B83C28]'
-                : 'bg-white/60 text-[#2d1200] border-[#2d1200]/15 hover:bg-white/80'
-            }`}
+            onClick={onExport}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#B83C28] text-white font-medium text-xs hover:bg-[#9a3121] transition-colors"
           >
-            <div className={`w-2 h-2 rounded-full ${DOT_COLOR_MAP[col.color] ?? 'bg-blue-400'}`} />
-            {col.label}
-            <span className={`text-xs ${idx === activeIndex ? 'text-white/80' : 'text-[#2d1200]/50'}`}>
-              {columnTotals[col.id]}▲
-            </span>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
           </button>
-        ))}
-      </div>
-
-      {/* Focused column */}
-      {activeColumn && (
-        <div className="rounded-2xl border border-white/50 bg-white/70 shadow-[0_4px_24px_rgba(45,18,0,0.10)] p-6" style={{ backdropFilter: 'blur(18px)' }}>
-          {/* Column header + navigation */}
-          <div className="flex items-center justify-between mb-5">
-            <button
-              onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
-              disabled={activeIndex === 0}
-              className="p-2 rounded-lg text-[#2d1200]/40 hover:text-[#2d1200] hover:bg-[#2d1200]/8 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            <div className="flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${DOT_COLOR_MAP[activeColumn.color] ?? 'bg-blue-400'}`} />
-              <h2 className="font-semibold text-[#2d1200] text-lg">{activeColumn.label}</h2>
-              <span className="text-sm text-[#2d1200]/50">
-                — {columnTotals[activeColumn.id]} vote{columnTotals[activeColumn.id] !== 1 ? 's' : ''}
-              </span>
-              <span className="text-xs text-[#2d1200]/40 ml-1">
-                ({activeIndex + 1} of {sortedColumns.length})
-              </span>
-            </div>
-
-            <button
-              onClick={() => setActiveIndex((i) => Math.min(sortedColumns.length - 1, i + 1))}
-              disabled={activeIndex === sortedColumns.length - 1}
-              className="p-2 rounded-lg text-[#2d1200]/40 hover:text-[#2d1200] hover:bg-[#2d1200]/8 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Items */}
-          {activeItems.length === 0 ? (
-            <p className="text-center text-[#2d1200]/40 text-sm py-8">No cards in this group</p>
-          ) : (
-            <div className="flex flex-col gap-3 max-w-2xl mx-auto">
-              {activeItems.map((item) => {
-                if (item.kind === 'group') {
-                  return (
-                    <div key={item.groupId} className="rounded-xl border border-[#2d1200]/15 bg-[#2d1200]/3 p-3.5">
-                      <div className="flex items-center gap-2 mb-2.5">
-                        <svg className="w-3.5 h-3.5 text-[#2d1200]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        <span className="text-xs font-semibold text-[#2d1200]/70">{item.groupName}</span>
-                        <span className="text-xs text-[#2d1200]/40">{item.cards.length} cards · {item.totalVotes}▲</span>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {item.cards.map((card) => {
-                          const vc = votes[card.id]?.length ?? 0
-                          return (
-                            <div key={card.id} className="flex items-start gap-3 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50">
-                              <div className="flex items-center justify-center min-w-[1.75rem] h-7 rounded-full bg-[#B83C28]/10 text-[#B83C28] text-xs font-semibold">
-                                {vc}
-                              </div>
-                              <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{card.content}</p>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                }
-
-                // Ungrouped card
-                return (
-                  <div key={item.card.id} className="flex items-start gap-3 p-4 rounded-xl border border-[#2d1200]/10 bg-white/50">
-                    <div className="flex items-center justify-center min-w-[2rem] h-8 rounded-full bg-[#B83C28]/10 text-[#B83C28] text-sm font-semibold">
-                      {item.voteCount}
-                    </div>
-                    <p className="flex-1 text-sm text-[#2d1200] leading-relaxed whitespace-pre-wrap break-words">{item.card.content}</p>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </div>
-      )}
+      </aside>
 
-      {/* Export */}
-      <div className="flex justify-center pt-2">
-        <button
-          onClick={onExport}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#B83C28] text-white font-medium text-sm hover:bg-[#9a3121] transition-colors shadow-sm"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export as Markdown
-        </button>
-      </div>
+      {/* ── Center panel ── */}
+      <main className="flex-1 min-w-0">
+        {activeItem ? (
+          activeItem.kind === 'group' ? (
+            <div>
+              {/* Group header */}
+              <div className="flex items-center gap-2 mb-6">
+                <svg className="w-4 h-4 text-[#2d1200]/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <h2 className="text-lg font-semibold text-[#2d1200]">{activeItem.name}</h2>
+                <div className="flex items-center gap-1.5 ml-2">
+                  {activeItem.cards[0] && (
+                    <>
+                      <div className={`w-1.5 h-1.5 rounded-full ${columnDotClass(activeItem.cards[0].column_id)}`} />
+                      <span className="text-xs text-[#2d1200]/50">{columnLabel(activeItem.cards[0].column_id)}</span>
+                    </>
+                  )}
+                </div>
+                {activeItem.totalVotes > 0 && (
+                  <span className="ml-auto text-sm font-semibold text-[#B83C28]">▲ {activeItem.totalVotes} votes</span>
+                )}
+              </div>
+              <div>
+                {activeItem.cards.map((card) => (
+                  <CenterCard key={card.id} card={card} userKey={userKey} voteCount={votes[card.id]?.length ?? 0} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              {/* Ungrouped card header */}
+              <div className="flex items-center gap-2 mb-6">
+                <div className={`w-1.5 h-1.5 rounded-full ${columnDotClass(activeItem.card.column_id)}`} />
+                <span className="text-xs text-[#2d1200]/50">{columnLabel(activeItem.card.column_id)}</span>
+                {activeItem.voteCount > 0 && (
+                  <span className="ml-auto text-sm font-semibold text-[#B83C28]">▲ {activeItem.voteCount} votes</span>
+                )}
+              </div>
+              <CenterCard card={activeItem.card} userKey={userKey} voteCount={activeItem.voteCount} />
+            </div>
+          )
+        ) : (
+          <p className="text-sm text-[#2d1200]/30 text-center py-16">Select an item from the sidebar</p>
+        )}
+      </main>
     </div>
   )
 }

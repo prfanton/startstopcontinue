@@ -1,13 +1,15 @@
 'use client'
 
 import { create } from 'zustand'
-import type { Session, Card, Vote, CardGroup } from '@/types/retro'
+import type { Session, Card, Vote, CardGroup, Reaction } from '@/types/retro'
 
 interface BoardStore {
   session: Session | null
   cards: Record<string, Card>
   votes: Record<string, Vote[]>
   groups: Record<string, CardGroup>
+  // reactions[card_id] = Reaction[]
+  reactions: Record<string, Reaction[]>
   optimisticCards: Record<string, Card>
   isLoaded: boolean
 
@@ -15,6 +17,7 @@ interface BoardStore {
   setCards: (cards: Card[]) => void
   setVotes: (votes: Vote[]) => void
   setGroups: (groups: CardGroup[]) => void
+  setReactions: (reactions: Reaction[]) => void
   setLoaded: (loaded: boolean) => void
 
   applyCardUpsert: (card: Card) => void
@@ -23,6 +26,8 @@ interface BoardStore {
   applyVoteDelete: (vote: { card_id: string; user_key: string }) => void
   applyGroupUpsert: (group: CardGroup) => void
   applyGroupDelete: (id: string) => void
+  applyReactionInsert: (reaction: Reaction) => void
+  applyReactionDelete: (reaction: { card_id: string; user_key: string; emoji: string }) => void
 
   addOptimisticCard: (card: Card) => void
   confirmOptimisticCard: (tempId: string, serverCard: Card) => void
@@ -34,6 +39,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   cards: {},
   votes: {},
   groups: {},
+  reactions: {},
   optimisticCards: {},
   isLoaded: false,
 
@@ -110,6 +116,32 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
 
   applyGroupUpsert: (group) =>
     set((state) => ({ groups: { ...state.groups, [group.id]: group } })),
+
+  setReactions: (reactions) => {
+    const map: Record<string, Reaction[]> = {}
+    for (const r of reactions) {
+      if (!map[r.card_id]) map[r.card_id] = []
+      map[r.card_id].push(r)
+    }
+    set({ reactions: map })
+  },
+
+  applyReactionInsert: (reaction) =>
+    set((state) => {
+      const existing = state.reactions[reaction.card_id] ?? []
+      if (existing.some((r) => r.user_key === reaction.user_key && r.emoji === reaction.emoji)) return state
+      return { reactions: { ...state.reactions, [reaction.card_id]: [...existing, reaction] } }
+    }),
+
+  applyReactionDelete: ({ card_id, user_key, emoji }) =>
+    set((state) => ({
+      reactions: {
+        ...state.reactions,
+        [card_id]: (state.reactions[card_id] ?? []).filter(
+          (r) => !(r.user_key === user_key && r.emoji === emoji)
+        ),
+      },
+    })),
 
   applyGroupDelete: (id) =>
     set((state) => {
