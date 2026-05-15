@@ -403,10 +403,16 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
     // --- Drop on the UNGROUP zone ---
     if (overId.startsWith('ungroup:')) {
       if (!draggedCard.group_id) return
+      const originalGroupId = draggedCard.group_id
+      const originalGroupCardCount = cardsByGroup[originalGroupId]?.length ?? 0
       const targetColId = overId.slice(8)
       const updated = { ...draggedCard, group_id: null, column_id: targetColId }
       applyCardUpsert(updated)
       await supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
+      if (originalGroupCardCount <= 1) {
+        applyGroupDelete(originalGroupId)
+        await supabase.from('groups').delete().eq('id', originalGroupId)
+      }
       return
     }
 
@@ -417,9 +423,17 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
       if (!group) return
       if (draggedCard.group_id === groupId) return // already in this group
 
+      const originalGroupId = draggedCard.group_id
+      const originalGroupCardCount = originalGroupId ? (cardsByGroup[originalGroupId]?.length ?? 0) : 0
+
       const updated = { ...draggedCard, group_id: groupId, column_id: group.column_id }
       applyCardUpsert(updated)
       await supabase.from('cards').update({ group_id: groupId, column_id: group.column_id }).eq('id', draggedCard.id)
+
+      if (originalGroupId && originalGroupCardCount <= 1) {
+        applyGroupDelete(originalGroupId)
+        await supabase.from('groups').delete().eq('id', originalGroupId)
+      }
       return
     }
 
@@ -428,9 +442,17 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
       const targetColId = overId.slice(4)
       if (draggedCard.group_id === null && draggedCard.column_id === targetColId) return
 
+      const originalGroupId = draggedCard.group_id
+      const originalGroupCardCount = originalGroupId ? (cardsByGroup[originalGroupId]?.length ?? 0) : 0
+
       const updated = { ...draggedCard, group_id: null, column_id: targetColId }
       applyCardUpsert(updated)
       await supabase.from('cards').update({ group_id: null, column_id: targetColId }).eq('id', draggedCard.id)
+
+      if (originalGroupId && originalGroupCardCount <= 1) {
+        applyGroupDelete(originalGroupId)
+        await supabase.from('groups').delete().eq('id', originalGroupId)
+      }
       return
     }
 
@@ -443,9 +465,18 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
       if (targetCard.group_id) {
         const group = allGroups[targetCard.group_id]
         if (!group) return
+
+        const originalGroupId = draggedCard.group_id
+        const originalGroupCardCount = originalGroupId ? (cardsByGroup[originalGroupId]?.length ?? 0) : 0
+
         const updated = { ...draggedCard, group_id: targetCard.group_id, column_id: group.column_id }
         applyCardUpsert(updated)
         await supabase.from('cards').update({ group_id: targetCard.group_id, column_id: group.column_id }).eq('id', draggedCard.id)
+
+        if (originalGroupId && originalGroupCardCount <= 1) {
+          applyGroupDelete(originalGroupId)
+          await supabase.from('groups').delete().eq('id', originalGroupId)
+        }
         return
       }
 
@@ -472,6 +503,21 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
 
       await supabase.from('cards').update({ group_id: newGroup.id, column_id: targetColId }).eq('id', draggedCard.id)
       await supabase.from('cards').update({ group_id: newGroup.id }).eq('id', targetCard.id)
+
+      // AI rename — fire-and-forget, graceful fallback
+      fetch('/api/group-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [draggedCard.content, targetCard.content] }),
+      })
+        .then((r) => r.json())
+        .then(({ name }: { name: string }) => {
+          if (name && name !== 'Group') {
+            applyGroupUpsert({ ...(newGroup as CardGroup), name })
+            supabase.from('groups').update({ name }).eq('id', newGroup.id)
+          }
+        })
+        .catch(() => undefined)
       return
     }
   }
@@ -499,10 +545,16 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
   const handleRemoveFromGroup = useCallback(async (cardId: string) => {
     const card = allCards[cardId]
     if (!card || !card.group_id) return
+    const groupId = card.group_id
+    const groupCardCount = cardsByGroup[groupId]?.length ?? 0
     const updated = { ...card, group_id: null }
     applyCardUpsert(updated)
     await supabase.from('cards').update({ group_id: null }).eq('id', cardId)
-  }, [allCards, applyCardUpsert, supabase])
+    if (groupCardCount <= 1) {
+      applyGroupDelete(groupId)
+      await supabase.from('groups').delete().eq('id', groupId)
+    }
+  }, [allCards, cardsByGroup, applyCardUpsert, applyGroupDelete, supabase])
 
   return (
     <DndContext
