@@ -10,6 +10,7 @@ import { usePresenceStore } from '@/store/presenceStore'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import BoardColumn from './BoardColumn'
 import GroupingBoard from './GroupingBoard'
+import VotingBoard from './VotingBoard'
 import ResultsView from './ResultsView'
 import WorkflowBreadcrumb, { STEPS, ORDER } from './WorkflowBreadcrumb'
 import JoinModal from '@/components/session/JoinModal'
@@ -179,6 +180,8 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
             />
           ) : phase === 'grouping' ? (
             <GroupingBoard format={format} sessionId={session.id} />
+          ) : phase === 'voting' ? (
+            <VotingBoard format={format} sessionId={session.id} userKey={userKey} />
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
               {format.columns.map((col) => (
