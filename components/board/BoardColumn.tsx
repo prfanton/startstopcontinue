@@ -67,6 +67,17 @@ export default function BoardColumn({
 
       {/* Cards */}
       <div className="flex flex-col gap-2 flex-1">
+        {!isLocked && (
+          <AddCardButton
+            sessionId={sessionId}
+            columnId={column.id}
+            userKey={userKey}
+            displayName={displayName}
+            placeholder={column.placeholder}
+            onBroadcastTyping={onBroadcastTyping}
+          />
+        )}
+
         {colCards.map((card) => (
           <RetroCard
             key={card.id}
@@ -81,17 +92,6 @@ export default function BoardColumn({
             participants={participants}
           />
         ))}
-
-        {!isLocked && (
-          <AddCardButton
-            sessionId={sessionId}
-            columnId={column.id}
-            userKey={userKey}
-            displayName={displayName}
-            placeholder={column.placeholder}
-            onBroadcastTyping={onBroadcastTyping}
-          />
-        )}
       </div>
     </div>
   )
