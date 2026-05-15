@@ -39,6 +39,14 @@ export interface Vote {
   created_at: string
 }
 
+export interface Reaction {
+  id: string
+  card_id: string
+  user_key: string
+  emoji: string
+  created_at: string
+}
+
 export interface Participant {
   id: string
   session_id: string

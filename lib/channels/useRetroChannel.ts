@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { useBoardStore } from '@/store/boardStore'
 import { usePresenceStore } from '@/store/presenceStore'
-import type { Card, Vote, Session, PresenceUser, CardGroup } from '@/types/retro'
+import type { Card, Vote, Session, PresenceUser, CardGroup, Reaction } from '@/types/retro'
 
 interface UseRetroChannelOptions {
   sessionId: string
@@ -18,10 +18,11 @@ type AnyPayload = { new: any; old: any; payload: any }
 export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroChannelOptions) {
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseClient>['channel']> | null>(null)
   const {
-    setSession, setCards, setVotes, setGroups, setLoaded,
+    setSession, setCards, setVotes, setGroups, setReactions, setLoaded,
     applyCardUpsert, applyCardDelete,
     applyVoteInsert, applyVoteDelete,
     applyGroupUpsert, applyGroupDelete,
+    applyReactionInsert, applyReactionDelete,
   } = useBoardStore.getState()
   const { setParticipants, setTyping, clearTyping } = usePresenceStore.getState()
 
@@ -39,10 +40,15 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
 
     const cardIds = cards.map((c) => c.id)
     if (cardIds.length > 0) {
-      const votesRes = await supabase.from('votes').select('*').in('card_id', cardIds)
+      const [votesRes, reactionsRes] = await Promise.all([
+        supabase.from('votes').select('*').in('card_id', cardIds),
+        supabase.from('reactions').select('*').in('card_id', cardIds),
+      ])
       if (votesRes.data) setVotes(votesRes.data as Vote[])
+      if (reactionsRes.data) setReactions(reactionsRes.data as Reaction[])
     } else {
       setVotes([])
+      setReactions([])
     }
     setLoaded(true)
   }
@@ -103,6 +109,18 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'groups', filter: `session_id=eq.${sessionId}` },
       (payload: AnyPayload) => applyGroupDelete((payload.old as { id: string }).id)
+    )
+
+    // Postgres Changes: reactions
+    channel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'reactions' },
+      (payload: AnyPayload) => applyReactionInsert(payload.new as Reaction)
+    )
+    channel.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'reactions' },
+      (payload: AnyPayload) => applyReactionDelete(payload.old as { card_id: string; user_key: string; emoji: string })
     )
 
     // Postgres Changes: sessions
