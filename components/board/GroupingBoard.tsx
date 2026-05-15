@@ -523,7 +523,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
       fetch('/api/group-name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [draggedCard.content, targetCard.content] }),
+        body: JSON.stringify({ contents: [draggedCard.content.slice(0, 500), targetCard.content.slice(0, 500)] }),
       })
         .then((r) => r.json())
         .then(({ name }: { name: string }) => {

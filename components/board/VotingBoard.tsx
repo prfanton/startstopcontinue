@@ -74,9 +74,9 @@ function GroupItem({ group, cards, userKey, votesLeft }: {
         }
       }
     } else {
-      const newVote = { id: crypto.randomUUID(), card_id: proxyCard.id, user_key: userKey, created_at: new Date().toISOString() }
-      applyVoteInsert(newVote)
-      await supabase.from('votes').insert({ card_id: proxyCard.id, user_key: userKey })
+      const id = crypto.randomUUID()
+      applyVoteInsert({ id, card_id: proxyCard.id, user_key: userKey, created_at: new Date().toISOString() })
+      await supabase.from('votes').insert({ id, card_id: proxyCard.id, user_key: userKey })
     }
   }
 
@@ -117,9 +117,9 @@ function CardItem({ card, userKey, votesLeft }: { card: Card; userKey: string; v
       applyVoteDelete({ card_id: card.id, user_key: userKey })
       await supabase.from('votes').delete().eq('card_id', card.id).eq('user_key', userKey)
     } else {
-      const newVote = { id: crypto.randomUUID(), card_id: card.id, user_key: userKey, created_at: new Date().toISOString() }
-      applyVoteInsert(newVote)
-      await supabase.from('votes').insert({ card_id: card.id, user_key: userKey })
+      const id = crypto.randomUUID()
+      applyVoteInsert({ id, card_id: card.id, user_key: userKey, created_at: new Date().toISOString() })
+      await supabase.from('votes').insert({ id, card_id: card.id, user_key: userKey })
     }
   }
 

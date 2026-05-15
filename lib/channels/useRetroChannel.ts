@@ -82,16 +82,24 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
       (payload: AnyPayload) => applyCardDelete((payload.old as { id: string }).id)
     )
 
-    // Postgres Changes: votes
+    // Postgres Changes: votes (guard against foreign-session events leaking in)
     channel.on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'votes' },
-      (payload: AnyPayload) => applyVoteInsert(payload.new as Vote)
+      (payload: AnyPayload) => {
+        const vote = payload.new as Vote
+        if (!useBoardStore.getState().cards[vote.card_id]) return
+        applyVoteInsert(vote)
+      }
     )
     channel.on(
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'votes' },
-      (payload: AnyPayload) => applyVoteDelete(payload.old as { card_id: string; user_key: string })
+      (payload: AnyPayload) => {
+        const vote = payload.old as { card_id: string; user_key: string }
+        if (!useBoardStore.getState().cards[vote.card_id]) return
+        applyVoteDelete(vote)
+      }
     )
 
     // Postgres Changes: groups
@@ -111,16 +119,24 @@ export function useRetroChannel({ sessionId, userKey, displayName }: UseRetroCha
       (payload: AnyPayload) => applyGroupDelete((payload.old as { id: string }).id)
     )
 
-    // Postgres Changes: reactions
+    // Postgres Changes: reactions (guard against foreign-session events leaking in)
     channel.on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'reactions' },
-      (payload: AnyPayload) => applyReactionInsert(payload.new as Reaction)
+      (payload: AnyPayload) => {
+        const reaction = payload.new as Reaction
+        if (!useBoardStore.getState().cards[reaction.card_id]) return
+        applyReactionInsert(reaction)
+      }
     )
     channel.on(
       'postgres_changes',
       { event: 'DELETE', schema: 'public', table: 'reactions' },
-      (payload: AnyPayload) => applyReactionDelete(payload.old as { card_id: string; user_key: string; emoji: string })
+      (payload: AnyPayload) => {
+        const reaction = payload.old as { card_id: string; user_key: string; emoji: string }
+        if (!useBoardStore.getState().cards[reaction.card_id]) return
+        applyReactionDelete(reaction)
+      }
     )
 
     // Postgres Changes: sessions

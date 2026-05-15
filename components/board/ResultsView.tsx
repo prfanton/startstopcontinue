@@ -6,6 +6,7 @@ import { useBoardStore } from '@/store/boardStore'
 import type { RetroFormat, Card } from '@/types/retro'
 
 const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '💡', '🔥', '😮', '😢', '👎']
+const ALLOWED_EMOJIS = new Set(EMOJI_OPTIONS)
 
 interface ResultsViewProps {
   format: RetroFormat
@@ -38,13 +39,15 @@ function ReactionBar({ cardId, userKey }: { cardId: string; userKey: string }) {
 
   async function toggleReaction(emoji: string) {
     setPickerOpen(false)
+    if (!ALLOWED_EMOJIS.has(emoji)) return
     if (grouped[emoji]?.hasReacted) {
       applyReactionDelete({ card_id: cardId, user_key: userKey, emoji })
       await supabase.from('reactions').delete().eq('card_id', cardId).eq('user_key', userKey).eq('emoji', emoji)
     } else {
-      const newReaction = { id: crypto.randomUUID(), card_id: cardId, user_key: userKey, emoji, created_at: new Date().toISOString() }
+      const id = crypto.randomUUID()
+      const newReaction = { id, card_id: cardId, user_key: userKey, emoji, created_at: new Date().toISOString() }
       applyReactionInsert(newReaction)
-      await supabase.from('reactions').insert({ card_id: cardId, user_key: userKey, emoji })
+      await supabase.from('reactions').insert({ id, card_id: cardId, user_key: userKey, emoji })
     }
   }
 
