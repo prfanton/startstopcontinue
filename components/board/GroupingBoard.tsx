@@ -28,15 +28,15 @@ import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 // only the hover highlight communicates where a drop will land.
 const noSortingStrategy: SortingStrategy = () => null
 
-// Keeps the drag overlay anchored to the pointer instead of the card's origin.
+// Keeps the drag overlay centered on the cursor.
+// adj = cursor_at_drag_start - card_center_at_drag_start (constant offset)
+// overlay_center = card_origin + transform + adj = cursor_start + transform = current_cursor
 const snapToPointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (draggingNodeRect && activatorEvent instanceof PointerEvent) {
-    const offsetX = activatorEvent.clientX - draggingNodeRect.left
-    const offsetY = activatorEvent.clientY - draggingNodeRect.top
     return {
       ...transform,
-      x: transform.x + draggingNodeRect.width / 2 - offsetX,
-      y: transform.y + draggingNodeRect.height / 2 - offsetY,
+      x: transform.x + activatorEvent.clientX - draggingNodeRect.left - draggingNodeRect.width / 2,
+      y: transform.y + activatorEvent.clientY - draggingNodeRect.top - draggingNodeRect.height / 2,
     }
   }
   return transform
