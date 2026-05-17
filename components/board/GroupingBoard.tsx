@@ -28,15 +28,15 @@ import type { RetroFormat, Card, CardGroup } from '@/types/retro'
 // only the hover highlight communicates where a drop will land.
 const noSortingStrategy: SortingStrategy = () => null
 
-// Keeps the drag overlay anchored to the pointer instead of the card's origin.
+// Keeps the drag overlay centered on the cursor.
+// adj = cursor_at_drag_start - card_center_at_drag_start (constant offset)
+// overlay_center = card_origin + transform + adj = cursor_start + transform = current_cursor
 const snapToPointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (draggingNodeRect && activatorEvent instanceof PointerEvent) {
-    const offsetX = activatorEvent.clientX - draggingNodeRect.left
-    const offsetY = activatorEvent.clientY - draggingNodeRect.top
     return {
       ...transform,
-      x: transform.x + draggingNodeRect.width / 2 - offsetX,
-      y: transform.y + draggingNodeRect.height / 2 - offsetY,
+      x: transform.x + activatorEvent.clientX - draggingNodeRect.left - draggingNodeRect.width / 2,
+      y: transform.y + activatorEvent.clientY - draggingNodeRect.top - draggingNodeRect.height / 2,
     }
   }
   return transform
@@ -75,15 +75,16 @@ function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean
       ref={setNodeRef}
       style={overlay ? undefined : style}
       {...attributes}
-      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed transition-colors
+      {...listeners}
+      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed transition-colors touch-none
         ${overlay
-          ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90'
+          ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90 cursor-grabbing'
           : groupingHint
-            ? 'border-[#B83C28]/60 bg-[#B83C28]/8 ring-2 ring-[#B83C28]/25'
-            : 'border-[#2d1200]/10 hover:border-[#2d1200]/25'}
+            ? 'border-[#B83C28]/60 bg-[#B83C28]/8 ring-2 ring-[#B83C28]/25 cursor-grab'
+            : 'border-[#2d1200]/10 hover:border-[#2d1200]/25 cursor-grab active:cursor-grabbing'}
       `}
     >
-      <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
+      <span className="mt-0.5 shrink-0">
         <DragHandle />
       </span>
       <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
@@ -111,13 +112,15 @@ function GroupCard({ card, groupId, onRemoveFromGroup }: {
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
       {...attributes}
-      className="flex items-start gap-2 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50 text-sm text-[#2d1200] leading-relaxed group/card"
+      {...listeners}
+      className="flex items-start gap-2 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50 text-sm text-[#2d1200] leading-relaxed group/card cursor-grab active:cursor-grabbing touch-none"
     >
-      <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
+      <span className="mt-0.5 shrink-0">
         <DragHandle />
       </span>
       <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
       <button
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onRemoveFromGroup(card.id)}
         title="Remove from group"
         className="opacity-0 group-hover/card:opacity-100 mt-0.5 text-[#2d1200]/30 hover:text-[#B83C28] transition-all shrink-0"
@@ -579,7 +582,7 @@ export default function GroupingBoard({ format, sessionId }: GroupingBoardProps)
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className="mb-3 flex items-center gap-2 text-xs text-[#2d1200]/50">
+      <div className="mb-3 flex items-center gap-2 text-xs text-[#2d1200]/80">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>

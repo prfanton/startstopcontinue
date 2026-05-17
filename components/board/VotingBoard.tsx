@@ -200,6 +200,19 @@ function VotingColumn({ columnId, columnLabel, columnColor, sessionId, userKey, 
 
 // ─── Vote status bar ──────────────────────────────────────────────────────────
 
+function VoteDots({ used }: { used: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: MAX_VOTES }).map((_, i) => (
+        <div
+          key={i}
+          className={`w-3 h-3 rounded-full ${i < used ? 'bg-[#B83C28]' : 'bg-[#2d1200]/12'}`}
+        />
+      ))}
+    </div>
+  )
+}
+
 function VoteStatusBar({ userVoteCount, sessionId, userKey }: {
   userVoteCount: number
   sessionId: string
@@ -214,22 +227,26 @@ function VoteStatusBar({ userVoteCount, sessionId, userKey }: {
     [allCards, sessionId]
   )
 
-  // Participants who haven't cast any vote yet
-  const notVotedCount = useMemo(() => {
-    const voterKeys = new Set(
-      sessionCardIds.flatMap((cid) => (votes[cid] ?? []).map((v) => v.user_key))
-    )
-    return participants.filter((p) => !voterKeys.has(p.user_key) && p.user_key !== userKey).length
-  }, [sessionCardIds, votes, participants, userKey])
+  const participantVotes = useMemo(() =>
+    participants
+      .filter((p) => p.user_key !== userKey)
+      .map((p) => ({
+        ...p,
+        used: sessionCardIds.reduce(
+          (sum, cid) => sum + (votes[cid]?.filter((v) => v.user_key === p.user_key).length ?? 0),
+          0
+        ),
+      })),
+    [participants, sessionCardIds, votes, userKey]
+  )
 
   const votesLeft = MAX_VOTES - userVoteCount
-  const allDone = votesLeft === 0
 
   return (
-    <div className="mb-4 flex items-center justify-between gap-4 px-1">
-      {/* My votes remaining */}
+    <div className="mb-4 px-1 flex flex-col gap-2">
+      {/* My votes */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-[#2d1200]/50 font-medium">Your votes</span>
+        <span className="text-xs text-[#2d1200]/50 font-medium w-16 shrink-0">You</span>
         <div className="flex items-center gap-1">
           {Array.from({ length: MAX_VOTES }).map((_, i) => (
             <div
@@ -246,19 +263,24 @@ function VoteStatusBar({ userVoteCount, sessionId, userKey }: {
             </div>
           ))}
         </div>
-        <span className={`text-xs font-semibold ${allDone ? 'text-[#B83C28]' : 'text-[#2d1200]/70'}`}>
-          {allDone ? 'All used' : `${votesLeft} left`}
+        <span className={`text-xs font-semibold ${votesLeft === 0 ? 'text-[#B83C28]' : 'text-[#2d1200]/70'}`}>
+          {votesLeft === 0 ? 'All used' : `${votesLeft} left`}
         </span>
       </div>
 
-      {/* Participants still to vote */}
-      {participants.length > 1 && (
-        <span className="text-xs text-[#2d1200]/50">
-          {notVotedCount === 0
-            ? 'Everyone has voted'
-            : `${notVotedCount} ${notVotedCount === 1 ? 'person hasn\'t' : 'people haven\'t'} voted yet`}
-        </span>
-      )}
+      {/* Team votes */}
+      {participantVotes.map((p) => {
+        const remaining = MAX_VOTES - p.used
+        return (
+          <div key={p.user_key} className="flex items-center gap-2">
+            <span className="text-xs text-[#2d1200]/60 font-medium w-16 shrink-0 truncate">{p.display_name}</span>
+            <VoteDots used={p.used} />
+            <span className={`text-xs font-medium ${remaining === 0 ? 'text-[#B83C28]' : 'text-[#2d1200]/50'}`}>
+              {remaining === 0 ? 'Done' : `${remaining} left`}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }

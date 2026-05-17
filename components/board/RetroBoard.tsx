@@ -23,10 +23,49 @@ interface RetroBoardProps {
   session: Session
 }
 
+// ─── Finish modal ─────────────────────────────────────────────────────────────
+
+function FinishModal({ onExport, onClose }: { onExport: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[#2d1200]/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white/60 p-8 flex flex-col items-center text-center">
+        <img
+          src="/assets/logo-espresso-retro.avif"
+          alt="Espresso Retro"
+          className="h-24 w-auto mb-5"
+        />
+        <h2 className="text-2xl font-bold text-[#2d1200] mb-2">Retro complete!</h2>
+        <p className="text-[#2d1200]/65 text-sm leading-relaxed mb-8">
+          Great work, team. Your insights are captured — download the summary to share or revisit later.
+        </p>
+        <button
+          onClick={() => { onExport(); onClose() }}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-[#B83C28] hover:bg-[#9c2e1a] text-white font-semibold rounded-xl transition-colors mb-3"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download retro summary
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 text-sm font-medium text-[#2d1200]/60 hover:text-[#2d1200] hover:bg-[#2d1200]/8 rounded-xl transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── RetroBoard ────────────────────────────────────────────────────────────────
+
 export default function RetroBoard({ session: initialSession }: RetroBoardProps) {
   const [userKey] = useState(() => getUserKey())
   const [displayName, setDisplayNameState] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [showFinishModal, setShowFinishModal] = useState(false)
 
   const boardSession = useBoardStore((s) => s.session)
   const setSession = useBoardStore((s) => s.setSession)
@@ -156,11 +195,23 @@ export default function RetroBoard({ session: initialSession }: RetroBoardProps)
                     </svg>
                   </button>
                 )}
+                {phase === 'results' && (
+                  <button
+                    onClick={() => setShowFinishModal(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#B83C28] hover:bg-[#9c2e1a] shadow-sm shadow-[#B83C28]/30 transition-colors"
+                  >
+                    Finish 🎉
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {showFinishModal && (
+        <FinishModal onExport={handleExport} onClose={() => setShowFinishModal(false)} />
+      )}
 
       {/* Board */}
       <main className="flex-1 p-4 md:p-6 overflow-auto pt-0">

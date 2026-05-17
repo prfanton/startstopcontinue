@@ -191,7 +191,7 @@ export default function ResultsView({ format, sessionId, userKey, onExport }: Re
   return (
     <div className="flex gap-6 h-full min-h-[600px]">
       {/* ── Left sidebar ── */}
-      <aside className="w-64 shrink-0 flex flex-col gap-1 overflow-y-auto pr-1">
+      <aside className="w-64 shrink-0 flex flex-col gap-1 overflow-y-auto rounded-2xl border border-white/40 bg-white/20 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)] p-3" style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
         {sidebarItems.map((item) => {
           const isActive = item.id === activeId
           if (item.kind === 'group') {
@@ -255,7 +255,7 @@ export default function ResultsView({ format, sessionId, userKey, onExport }: Re
       </aside>
 
       {/* ── Center panel ── */}
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 rounded-2xl border border-white/40 bg-white/30 shadow-[0_4px_24px_rgba(45,18,0,0.10),0_1px_4px_rgba(45,18,0,0.06)] p-6" style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
         {activeItem ? (
           activeItem.kind === 'group' ? (
             <div>

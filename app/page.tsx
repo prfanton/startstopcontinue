@@ -43,14 +43,13 @@ export default function HomePage() {
             <img
               src="/assets/logo-espresso-retro.avif"
               alt="Espresso Retro"
-              className="mx-auto mb-3 h-28 w-auto drop-shadow-lg"
+              className="mx-auto mb-3 h-28 w-auto"
             />
             <img
               src="/assets/text-espresso-retro.svg"
               alt="Espresso Retro"
-              className="mx-auto mb-4 h-8 w-auto"
+              className="mx-auto mb-4 h-60 w-auto"
             />
-            <p className="text-[#2d1200]/70 text-base">Run better retrospectives with your team</p>
           </div>
 
           <h2 className="text-xl font-semibold text-[#2d1200] mb-6">Create a new session</h2>
