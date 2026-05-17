@@ -38,16 +38,21 @@ export default function HomePage() {
   return (
     <main className="animated-bg min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <img
-            src="/logo-espresso-retro-vertical.png"
-            alt="Start Stop Continue"
-            className="mx-auto mb-4 h-52 w-auto drop-shadow-lg"
-          />
-          <p className="text-[#2d1200]/70 text-lg">Run better retrospectives with your team</p>
-        </div>
-
         <div className="bg-white/40 backdrop-blur-md rounded-2xl p-8 shadow-2xl border border-white/50">
+          <div className="text-center mb-8">
+            <img
+              src="/assets/logo-espresso-retro.avif"
+              alt="Espresso Retro"
+              className="mx-auto mb-3 h-28 w-auto drop-shadow-lg"
+            />
+            <img
+              src="/assets/text-espresso-retro.svg"
+              alt="Espresso Retro"
+              className="mx-auto mb-4 h-8 w-auto"
+            />
+            <p className="text-[#2d1200]/70 text-base">Run better retrospectives with your team</p>
+          </div>
+
           <h2 className="text-xl font-semibold text-[#2d1200] mb-6">Create a new session</h2>
 
           <div className="space-y-4">
@@ -96,5 +101,6 @@ export default function HomePage() {
         </p>
       </div>
     </main>
+
   )
 }
