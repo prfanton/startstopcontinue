@@ -75,15 +75,16 @@ function SortableCard({ card, overlay = false }: { card: Card; overlay?: boolean
       ref={setNodeRef}
       style={overlay ? undefined : style}
       {...attributes}
-      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed transition-colors
+      {...listeners}
+      className={`flex items-start gap-2 p-3 rounded-xl border bg-white/60 shadow-sm text-sm text-[#2d1200] leading-relaxed transition-colors touch-none
         ${overlay
-          ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90'
+          ? 'shadow-lg rotate-1 border-[#B83C28]/40 bg-white/90 cursor-grabbing'
           : groupingHint
-            ? 'border-[#B83C28]/60 bg-[#B83C28]/8 ring-2 ring-[#B83C28]/25'
-            : 'border-[#2d1200]/10 hover:border-[#2d1200]/25'}
+            ? 'border-[#B83C28]/60 bg-[#B83C28]/8 ring-2 ring-[#B83C28]/25 cursor-grab'
+            : 'border-[#2d1200]/10 hover:border-[#2d1200]/25 cursor-grab active:cursor-grabbing'}
       `}
     >
-      <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
+      <span className="mt-0.5 shrink-0">
         <DragHandle />
       </span>
       <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
@@ -111,13 +112,15 @@ function GroupCard({ card, groupId, onRemoveFromGroup }: {
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
       {...attributes}
-      className="flex items-start gap-2 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50 text-sm text-[#2d1200] leading-relaxed group/card"
+      {...listeners}
+      className="flex items-start gap-2 p-2.5 rounded-lg border border-[#2d1200]/8 bg-white/50 text-sm text-[#2d1200] leading-relaxed group/card cursor-grab active:cursor-grabbing touch-none"
     >
-      <span {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing touch-none">
+      <span className="mt-0.5 shrink-0">
         <DragHandle />
       </span>
       <span className="flex-1 whitespace-pre-wrap break-words">{card.content}</span>
       <button
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onRemoveFromGroup(card.id)}
         title="Remove from group"
         className="opacity-0 group-hover/card:opacity-100 mt-0.5 text-[#2d1200]/30 hover:text-[#B83C28] transition-all shrink-0"
