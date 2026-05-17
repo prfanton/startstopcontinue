@@ -48,7 +48,7 @@ export default function HomePage() {
             <img
               src="/assets/text-espresso-retro.svg"
               alt="Espresso Retro"
-              className="mx-auto mb-4 h-60 w-auto"
+              className="mx-auto mb-4 h-[60px] w-auto"
             />
           </div>
 
