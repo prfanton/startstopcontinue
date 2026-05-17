@@ -32,17 +32,33 @@ export default function CardEditor({
   }
 
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => {
-        onChange(e.target.value)
-        onTyping?.()
-      }}
-      onKeyDown={handleKeyDown}
-      rows={3}
-      className="w-full bg-white/70 border border-[#2d1200]/15 rounded-lg px-3 py-2 text-[#2d1200] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#B83C28]/40 focus:border-[#B83C28]/30 placeholder-[#2d1200]/40 leading-relaxed"
-    />
+    <div className="flex flex-col gap-2">
+      <textarea
+        ref={ref}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => {
+          onChange(e.target.value)
+          onTyping?.()
+        }}
+        onKeyDown={handleKeyDown}
+        rows={3}
+        className="w-full bg-white/70 border border-[#2d1200]/15 rounded-lg px-3 py-2 text-[#2d1200] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#B83C28]/40 focus:border-[#B83C28]/30 placeholder-[#2d1200]/40 leading-relaxed"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={onSave}
+          className="flex-1 py-1.5 bg-[#B83C28] hover:bg-[#9c2e1a] text-white text-sm font-semibold rounded-lg transition-colors"
+        >
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-1.5 text-[#2d1200]/60 hover:text-[#2d1200] hover:bg-[#2d1200]/8 text-sm font-medium rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }
