@@ -41,16 +41,16 @@ export default function FacilitatorControls() {
   if (!session) return null
 
   return (
-    <div className="flex items-center gap-1 bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-lg px-2" style={{ height: '43px' }}>
+    <div className="flex items-center gap-2 bg-white/40 backdrop-blur-sm border border-[#2d1200]/20 rounded-xl px-3 py-1.5">
       <button
         onClick={() => adjustMinutes(-1)}
-        className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
+        className="w-8 h-8 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] hover:bg-[#2d1200]/10 font-bold text-lg rounded-lg transition-colors"
         title="Remove 1 minute"
       >−</button>
 
       <button
         onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
-        className={`mx-1 text-sm font-sans font-semibold w-12 text-center transition-colors ${
+        className={`text-base font-sans font-semibold w-14 text-center transition-colors ${
           isUrgent ? 'text-[#B83C28] animate-pulse' : 'text-[#2d1200]'
         }`}
         title={running ? 'Pause' : 'Start'}
@@ -60,21 +60,21 @@ export default function FacilitatorControls() {
 
       <button
         onClick={() => adjustMinutes(1)}
-        className="w-5 h-5 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] font-bold text-base leading-none transition-colors"
+        className="w-8 h-8 flex items-center justify-center text-[#2d1200]/60 hover:text-[#2d1200] hover:bg-[#2d1200]/10 font-bold text-lg rounded-lg transition-colors"
         title="Add 1 minute"
       >+</button>
 
       <button
         onClick={() => { if (totalSeconds > 0) setRunning((r) => !r) }}
-        className="ml-1 text-[#B83C28] hover:text-[#8a2a1a] transition-colors"
+        className="w-8 h-8 flex items-center justify-center text-[#B83C28] hover:text-[#8a2a1a] hover:bg-[#B83C28]/10 rounded-lg transition-colors"
         title={running ? 'Pause' : 'Start'}
       >
         {running ? (
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M6 4h4v16H6zm8 0h4v16h-4z"/>
           </svg>
         ) : (
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z"/>
           </svg>
         )}
@@ -82,10 +82,10 @@ export default function FacilitatorControls() {
 
       <button
         onClick={resetTimer}
-        className="ml-0.5 text-[#2d1200]/40 hover:text-[#2d1200]/70 transition-colors"
+        className="w-8 h-8 flex items-center justify-center text-[#2d1200]/40 hover:text-[#2d1200]/70 hover:bg-[#2d1200]/10 rounded-lg transition-colors"
         title="Reset timer"
       >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
